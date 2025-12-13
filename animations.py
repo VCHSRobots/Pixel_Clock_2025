@@ -113,3 +113,100 @@ class BouncingBox(BaseAnimation):
                 self.dy = -1
                 
             await asyncio.sleep_ms(int(self.speed * 1000))
+
+class ColorStringBuilder:
+    """
+    Helper to build a string with different colors for each segment.
+    """
+    def __init__(self):
+        self._data = [] # List of (char, color) tuples
+
+    def add(self, text, color):
+        for char in text:
+            self._data.append((char, color))
+    
+    def __len__(self):
+        return len(self._data)
+    
+    def __getitem__(self, idx):
+        return self._data[idx]
+        
+    def __iter__(self):
+        return iter(self._data)
+
+class ScrollingColoredText(BaseAnimation):
+    """
+    Scrolls multi-colored text.
+    buffer: ColorStringBuilder instance or list of (char, color) tuples.
+    """
+    def __init__(self, buffer, speed=0.1, font=None, loops=None):
+        super().__init__()
+        self.buffer = buffer
+        self.speed = speed
+        self.font = font
+        self.loops = loops
+        
+        if self.font is None:
+            self.font = neodisplay.NeoDisplay.FONT_LARGE
+            
+        self.char_width = 6 if self.font == neodisplay.NeoDisplay.FONT_LARGE else 4
+        self.total_width = len(buffer) * self.char_width
+        
+        # Y position centering
+        if self.font == neodisplay.NeoDisplay.FONT_SMALL:
+             self.y_pos = 2
+        else:
+             self.y_pos = 1
+
+    async def run(self):
+        start_x = self._display.width
+        end_x = -self.total_width
+        
+        loops_remaining = self.loops
+        current_x = start_x
+        
+        while not self.stopped:
+            if self.paused:
+                await asyncio.sleep_ms(100)
+                continue
+
+            self._display.fill(neodisplay.BLACK)
+            
+            # Draw visible characters
+            # Optimization: could only draw chars that are on screen, 
+            # but for 32 pixels width, simpler is fine.
+            
+            draw_cursor = current_x
+            
+            for char, color in self.buffer:
+                # Basic culling
+                if draw_cursor >= self._display.width:
+                    break
+                
+                # We need to know width of char to know if we skip it off left
+                # but draw_char handles clipping. We just need to advance cursor.
+                # However, for speed, if draw_cursor + char_width < 0, we can skip drawing?
+                # draw_char returns next x.
+                
+                # Check if completely off-screen left?
+                # A 5x7 char is usually 5 wide + 1 space = 6.
+                # 3x5 is 3 + 1 = 4.
+                
+                if draw_cursor < -6: # Safe margin
+                    draw_cursor += self.char_width
+                    continue
+
+                draw_cursor = self._display.draw_char(draw_cursor, self.y_pos, char, color, font=self.font)
+            
+            self._display.show()
+            
+            current_x -= 1
+            if current_x < end_x:
+                current_x = start_x 
+                if loops_remaining is not None:
+                    loops_remaining -= 1
+                    if loops_remaining <= 0:
+                        self.stop()
+                        return
+            
+            await asyncio.sleep_ms(int(self.speed * 1000))

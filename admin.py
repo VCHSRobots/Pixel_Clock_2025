@@ -102,7 +102,7 @@ def brightness(val):
 
 print("NeoDisplay Admin Loaded.")
 print("Functions: clear(), test_rgb(), test_corners(), test_text(str), set_pixel(x,y,c), brightness(val)")
-print("           scroll(str), test_manager()")
+print("           scroll(str), test_manager(), test_animations(), test_colored_scroll()")
 
 def test_manager():
     """Test DisplayManager queue/immediate logic."""
@@ -114,13 +114,13 @@ def test_manager():
     
     async def _test():
         print("Initializing Logic Manager...")
-        default_anim = BouncingBox(color=neodisplay.YELLOW, size=2, speed=0.05)
+        default_anim = BouncingBox(color=neodisplay.YELLOW, size=2, speed=0.01)
         mgr = DisplayManager(default_anim)
         await asyncio.sleep(4)
         
         print("1. Queueing 2 messages (ScrollingText loops=1)...")
-        mgr.queue_for_play(ScrollingText("Msg 1", color=neodisplay.GREEN, loops=1))
-        mgr.queue_for_play(ScrollingText("Msg 2", color=neodisplay.BLUE, loops=1))
+        mgr.queue_for_play(ScrollingText("Msg 1", speed=0.05, color=neodisplay.GREEN, loops=1))
+        mgr.queue_for_play(ScrollingText("Msg 2", speed=0.075, color=neodisplay.BLUE, loops=1))
         
         print("   Waiting for them (approx 2 scrolls)...")
         await mgr.wait_idle()
@@ -131,7 +131,7 @@ def test_manager():
         await asyncio.sleep(3) # Let it start
         
         print("   Interrupting now!")
-        mgr.play_immediate(ScrollingText("INTERRUPT!", color=neodisplay.RED, loops=2))
+        mgr.play_immediate(ScrollingText("INTERRUPT!", speed=0.02, color=neodisplay.RED, loops=2))
         await mgr.wait_idle()
         
         await asyncio.sleep(3)  # Go back to default
@@ -171,4 +171,38 @@ def test_animations():
         asyncio.run(_run_tests())
     except KeyboardInterrupt:
         mgr.stop()
+        print("Interrupted.")
+
+def test_colored_scroll():
+    """Test the Multi-Colored Scrolling Text."""
+    from dispman import DisplayManager
+    from animations import ScrollingColoredText, ColorStringBuilder
+    
+    d = get_d()
+    
+    async def _run_test():
+        mgr = DisplayManager()
+        
+        print("Building colored string...")
+        sb = ColorStringBuilder()
+        sb.add("R", neodisplay.RED)
+        sb.add("G", neodisplay.GREEN)
+        sb.add("B", neodisplay.BLUE)
+        sb.add(" ", neodisplay.BLACK)
+        sb.add("Cyber", neodisplay.CYAN)
+        sb.add("Punk", neodisplay.MAGENTA)
+        sb.add(" ", neodisplay.BLACK)
+        sb.add("2025", neodisplay.YELLOW)
+        
+        print("Queueing ScrollingColoredText (loops=2)...")
+        anim = ScrollingColoredText(sb, speed=0.08, loops=2)
+        mgr.queue_for_play(anim)
+        
+        await mgr.wait_idle()
+        print("Test Complete.")
+        mgr.stop()
+
+    try:
+        asyncio.run(_run_test())
+    except KeyboardInterrupt:
         print("Interrupted.")
