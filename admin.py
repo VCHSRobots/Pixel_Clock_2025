@@ -103,6 +103,8 @@ def brightness(val):
 print("NeoDisplay Admin Loaded.")
 print("Functions: clear(), test_rgb(), test_corners(), test_text(str), set_pixel(x,y,c), brightness(val)")
 print("           scroll(str), test_manager(), test_animations(), test_colored_scroll()")
+print("           test_pulse(), test_bouncing_box(), test_scrolling_text()")
+
 
 def test_manager():
     """Test DisplayManager queue/immediate logic."""
@@ -206,6 +208,94 @@ def test_colored_scroll():
         asyncio.run(_run_test())
     except KeyboardInterrupt:
         print("Interrupted.")
+
+def test_pulse(color=neodisplay.RED, count=5):
+    """Test the Pulse animation."""
+    from dispman import DisplayManager
+    from animations import Pulse
+    
+    # Ensure display is init
+    get_d()
+    
+    async def _run():
+        mgr = DisplayManager()
+        print(f"Testing Pulse (count={count})...")
+        # Pulse doesn't have a 'loops' count in __init__, so we play it and wait or check implementation.
+        # Looking at animations.py, Pulse loop is "while not self.stopped".
+        # So we queue it, let it run for a bit/cancel it, or we can't really "count" pulses easily 
+        # unless we modify Pulse or just sleep for (interval * 2 * count).
+        # Pulse interval is 1.0 (500ms on, 500ms off).
+        
+        # Actually animations.Pulse takes interval param. default 1.0.
+        anim = Pulse(color=color, interval=0.5) # slightly faster for test
+        mgr.play_immediate(anim)
+        
+        # Calculate duration: count * (0.5 on + 0.5 off)??
+        # Pulse implementation: 500ms on, 500ms off. Hardcoded sleep_ms(500).
+        # Wait, let's re-read Pulse implementation in animations.py.
+        # It has self.interval but uses hardcoded 500ms sleeps.
+        # That's a bug or unfinished feature in Pulse. 
+        # I should probably fix Pulse first if I want to test it properly, 
+        # but the prompt is "Add functions to test". 
+        # I'll stick to running it for a duration.
+        
+        duration = count * 1.0 # 1 sec per pulse approx
+        await asyncio.sleep(duration)
+        
+        mgr.stop()
+        print("Pulse Test Done.")
+
+    try:
+        asyncio.run(_run())
+    except KeyboardInterrupt:
+        print("Interrupted.")
+
+def test_bouncing_box(color=neodisplay.BLUE, size=2, duration=10):
+    """Test the Bouncing Box animation."""
+    from dispman import DisplayManager
+    from animations import BouncingBox
+    
+    get_d()
+    
+    async def _run():
+        mgr = DisplayManager()
+        print(f"Testing BouncingBox for {duration} seconds...")
+        anim = BouncingBox(color=color, size=size, speed=0.05)
+        mgr.play_immediate(anim)
+        
+        await asyncio.sleep(duration)
+        
+        mgr.stop()
+        print("BouncingBox Test Done.")
+        
+    try:
+        asyncio.run(_run())
+    except KeyboardInterrupt:
+        print("Interrupted.")
+
+def test_scrolling_text(text="Hello World", color=neodisplay.CYAN, loops=2):
+    """Test the Scrolling Text animation."""
+    from dispman import DisplayManager
+    from animations import ScrollingText
+    
+    get_d()
+    
+    async def _run():
+        mgr = DisplayManager()
+        print(f"Testing ScrollingText: '{text}' (loops={loops})...")
+        anim = ScrollingText(text, color=color, speed=0.08, loops=loops)
+        mgr.queue_for_play(anim)
+        
+        await mgr.wait_idle()
+        
+        mgr.stop()
+        print("ScrollingText Test Done.")
+
+    try:
+        asyncio.run(_run())
+    except KeyboardInterrupt:
+        print("Interrupted.")
+
 
 def start_main():
     """Start the main application loop."""

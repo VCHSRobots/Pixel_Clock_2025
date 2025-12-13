@@ -64,14 +64,21 @@ class ScrollingText(BaseAnimation):
             
             await asyncio.sleep_ms(int(self.speed * 1000))
 
-
+    def stop(self):
+        super().stop()
+        
 class BouncingBox(BaseAnimation):
     """
     A box that bounces around the screen.
+    If colors is a list, it cycles through them on every bounce.
     """
-    def __init__(self, color=neodisplay.BLUE, size=2, speed=0.05):
+    def __init__(self, color=neodisplay.BLUE, size=2, speed=0.05, change_color_on_bounce=False):
         super().__init__()
-        self.color = color
+        self.colors = [color] if not isinstance(color, list) else color
+        self.color_idx = 0
+        self.current_color = self.colors[0]
+        self.change_on_bounce = change_color_on_bounce or (len(self.colors) > 1)
+        
         self.size = size
         self.speed = speed
         
@@ -90,27 +97,36 @@ class BouncingBox(BaseAnimation):
                 continue
                 
             self._display.fill(neodisplay.BLACK)
-            self._display.fill_rect(self.x, self.y, self.size, self.size, self.color)
+            self._display.fill_rect(self.x, self.y, self.size, self.size, self.current_color)
             self._display.show()
             
             # Update position
             self.x += self.dx
             self.y += self.dy
             
+            bounced = False
             # Bounce
             if self.x <= 0:
                 self.x = 0
                 self.dx = 1
+                bounced = True
             elif self.x >= width - self.size:
                 self.x = width - self.size
                 self.dx = -1
+                bounced = True
                 
             if self.y <= 0:
                 self.y = 0
                 self.dy = 1
+                bounced = True
             elif self.y >= height - self.size:
                 self.y = height - self.size
                 self.dy = -1
+                bounced = True
+            
+            if bounced and self.change_on_bounce:
+                self.color_idx = (self.color_idx + 1) % len(self.colors)
+                self.current_color = self.colors[self.color_idx]
                 
             await asyncio.sleep_ms(int(self.speed * 1000))
 
@@ -210,3 +226,30 @@ class ScrollingColoredText(BaseAnimation):
                         return
             
             await asyncio.sleep_ms(int(self.speed * 1000))
+
+class Pulse(BaseAnimation):
+    """
+    Simple heartbeat/pulse animation.
+    """
+    def __init__(self, color=neodisplay.WHITE, interval=1.0):
+        super().__init__()
+        self.color = color
+        self.interval = interval
+        
+    async def run(self):
+        while not self.stopped:
+            if self.paused:
+                await asyncio.sleep_ms(100)
+                continue
+                
+            # Blink on
+            self._display.pixel(0, 0, self.color)
+            self._display.show()
+            # Half interval on
+            await asyncio.sleep_ms(int(self.interval * 500))
+            
+            # Blink off
+            self._display.pixel(0, 0, neodisplay.BLACK)
+            self._display.show()
+            # Half interval off
+            await asyncio.sleep_ms(int(self.interval * 500))
