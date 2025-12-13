@@ -253,3 +253,70 @@ class Pulse(BaseAnimation):
             self._display.show()
             # Half interval off
             await asyncio.sleep_ms(int(self.interval * 500))
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def wheel(pos):
+    """
+    Input a value 0 to 255 to get a color value.
+    The colours are a transition r - g - b - back to r.
+    """
+    if pos < 0 or pos > 255:
+        return (0, 0, 0)
+    if pos < 85:
+        return (255 - pos * 3, pos * 3, 0)
+    if pos < 170:
+        pos -= 85
+        return (0, 255 - pos * 3, pos * 3)
+    pos -= 170
+    return (pos * 3, 0, 255 - pos * 3)
+
+def dim_color(color, brightness):
+    """Dim a color tuple by a brightness factor (0.0 - 1.0)."""
+    r, g, b = color
+    return (int(r * brightness), int(g * brightness), int(b * brightness))
+
+class Rainbow(BaseAnimation):
+    """
+    Flowing Rainbow animation.
+    Replicates the 'moving rainbow' effect.
+    """
+    def __init__(self, speed=2, scale=5, brightness=0.5):
+        super().__init__()
+        self.speed = speed   # Rate of color change over time
+        self.scale = scale   # Rate of color change over space (tightness of rainbow)
+        self.brightness = brightness
+        self.offset = 0
+
+    async def run(self):
+        w = self._display.width
+        h = self._display.height
+        
+        while not self.stopped:
+            if self.paused:
+                await asyncio.sleep_ms(100)
+                continue
+            
+            # Generate frame
+            for x in range(w):
+                for y in range(h):
+                    # Diagonal rainbow pattern
+                    hue_val = (self.offset + (x * self.scale) + (y * self.scale)) % 256
+                    color = wheel(int(hue_val))
+                    
+                    # Apply brightness
+                    color = dim_color(color, self.brightness)
+                    
+                    self._display.pixel(x, y, color)
+            
+            self._display.show()
+            
+            # Update state
+            self.offset += self.speed
+            if self.offset >= 256:
+                self.offset -= 256
+                
+            await asyncio.sleep_ms(10)
+

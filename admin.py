@@ -7,39 +7,23 @@ import asyncio
 import neodisplay
 from neodisplay import NeoDisplay
 
-
-# Default Pin
-PIN_NUM = 16
-
-def get_d():
-    """Get or create the NeoDisplay instance."""
-    d = NeoDisplay.inst()
-    if d is None:
-        print(f"Initializing NeoDisplay on pin {PIN_NUM}...")
-        try:
-            d = NeoDisplay(PIN_NUM)
-        except RuntimeError:
-            # Race condition or it was just created
-            d = NeoDisplay.inst()
-    return d
-
 def scroll(text="Scroll Test", color=neodisplay.GREEN, font=None, interval=0.05):
     """Scroll text and return. interval=delay in seconds."""
-    d = get_d()
+    d = neodisplay.get_display()
     print(f"Scrolling '{text}' (speed={interval})...")
     asyncio.run(d.scroll_msg(text, color, interval=interval, font=font))
     print("Scroll Done.")
 
 def clear():
     """Clear the display."""
-    d = get_d()
+    d = neodisplay.get_display()
     d.fill(neodisplay.BLACK)
     d.show()
     print("Display cleared.")
 
 def test_rgb(delay=0.5):
     """Cycle full screen Red, Green, Blue, White."""
-    d = get_d()
+    d = neodisplay.get_display()
     colors = [
         ('Red', neodisplay.RED),
         ('Green', neodisplay.GREEN),
@@ -58,7 +42,7 @@ def test_rgb(delay=0.5):
 
 def test_corners():
     """Light up the 4 corners to verify orientation."""
-    d = get_d()
+    d = neodisplay.get_display()
     clear()
     
     w, h = NeoDisplay.WIDTH, NeoDisplay.HEIGHT
@@ -80,7 +64,7 @@ def test_corners():
 
 def test_text(text="Test", color=neodisplay.CYAN):
     """Write static text."""
-    d = get_d()
+    d = neodisplay.get_display()
     clear()
     print(f"Writing '{text}'")
     d.write_text(0, 1, text, color)
@@ -88,14 +72,14 @@ def test_text(text="Test", color=neodisplay.CYAN):
 
 def set_pixel(x, y, color=neodisplay.WHITE):
     """Manually set a single pixel."""
-    d = get_d()
+    d = neodisplay.get_display()
     print(f"Setting ({x}, {y}) to {color}")
     d.pixel(x, y, color)
     d.show()
     
 def brightness(val):
     """Set brightness (0.0 - 1.0)."""
-    d = get_d()
+    d = neodisplay.get_display()
     print(f"Setting brightness to {val}")
     d.brightness(val)
     d.show() # to apply
@@ -103,8 +87,15 @@ def brightness(val):
 print("NeoDisplay Admin Loaded.")
 print("Functions: clear(), test_rgb(), test_corners(), test_text(str), set_pixel(x,y,c), brightness(val)")
 print("           scroll(str), test_manager(), test_animations(), test_colored_scroll()")
-print("           test_pulse(), test_bouncing_box(), test_scrolling_text()")
+print("           test_pulse(), test_bouncing_box(), test_scrolling_text(), test_rainbow()")
 
+def char(c):
+    """Write a single character."""
+    d = neodisplay.get_display()
+    clear()
+    print(f"Writing '{c}'")
+    d.write_text(0, 1, c, neodisplay.CYAN)
+    d.show()
 
 def test_manager():
     """Test DisplayManager queue/immediate logic."""
@@ -112,7 +103,7 @@ def test_manager():
     from animations import ScrollingText
     from animations import BouncingBox
     
-    d = get_d()
+    d = neodisplay.get_display()
     
     async def _test():
         print("Initializing Logic Manager...")
@@ -147,7 +138,7 @@ def test_animations():
     from dispman import DisplayManager
     from animations import ScrollingText, BouncingBox
     
-    d = get_d()
+    d = neodisplay.get_display()
     # Mock default animation? No, just rely on foreground for test
     async def _run_tests():
         mgr = DisplayManager()
@@ -180,7 +171,7 @@ def test_colored_scroll():
     from dispman import DisplayManager
     from animations import ScrollingColoredText, ColorStringBuilder
     
-    d = get_d()
+    d = neodisplay.get_display()
     
     async def _run_test():
         mgr = DisplayManager()
@@ -213,10 +204,7 @@ def test_pulse(color=neodisplay.RED, count=5):
     """Test the Pulse animation."""
     from dispman import DisplayManager
     from animations import Pulse
-    
-    # Ensure display is init
-    get_d()
-    
+       
     async def _run():
         mgr = DisplayManager()
         print(f"Testing Pulse (count={count})...")
@@ -255,8 +243,6 @@ def test_bouncing_box(color=neodisplay.BLUE, size=2, duration=10):
     from dispman import DisplayManager
     from animations import BouncingBox
     
-    get_d()
-    
     async def _run():
         mgr = DisplayManager()
         print(f"Testing BouncingBox for {duration} seconds...")
@@ -278,8 +264,6 @@ def test_scrolling_text(text="Hello World", color=neodisplay.CYAN, loops=2):
     from dispman import DisplayManager
     from animations import ScrollingText
     
-    get_d()
-    
     async def _run():
         mgr = DisplayManager()
         print(f"Testing ScrollingText: '{text}' (loops={loops})...")
@@ -296,6 +280,26 @@ def test_scrolling_text(text="Hello World", color=neodisplay.CYAN, loops=2):
     except KeyboardInterrupt:
         print("Interrupted.")
 
+def test_rainbow(duration=10, speed=2, scale=5, brightness=0.2):
+    """Test the Rainbow animation."""
+    from dispman import DisplayManager
+    from animations import Rainbow  
+    
+    async def _run():
+        mgr = DisplayManager()
+        print(f"Testing Rainbow for {duration} seconds...")
+        anim = Rainbow(speed=speed, scale=scale, brightness=brightness)
+        mgr.play_immediate(anim)
+        
+        await asyncio.sleep(duration)
+        
+        mgr.stop()
+        print("Rainbow Test Done.")
+
+    try:
+        asyncio.run(_run())
+    except KeyboardInterrupt:
+        print("Interrupted.")
 
 def start_main():
     """Start the main application loop."""

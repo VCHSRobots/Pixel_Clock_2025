@@ -78,135 +78,139 @@ class TimeDisplay(BaseAnimation):
 
     def _draw_hh_mm(self, h, m):
         # Format: HH:MM centered
-        # We draw manually to control colon color and spacing
         
-        # Strings
-        s_h = "{:02d}".format(h)
+        if self.twelve_hour:
+             s_h = "{:d}".format(h)
+        else:
+             s_h = "{:02d}".format(h)
         s_m = "{:02d}".format(m)
         
-        # Calculate width
-        # Large font: char width 5 + 1 spacing = 6
-        # Colon: visual 2 + 1 spacing (maybe 2 spacing?)
-        # Let's use write_text logic mostly but split it up.
+        # Width Calculation
+        # write_text char width is 6 (5 + 1 spacing)
+        w_h = len(s_h) * 6
+        w_m = len(s_m) * 6
         
-        # Standard spacing:
-        # H(6) H(6) :(4) M(6) M(5) = 27 pixels wide roughly
-        # 32 - 27 = 5 pixels remainder.
-        # Start at x=2 or 3.
+        # Colon space: 1px colon + 1px spacing before (implicit in H?) + 1px spacing after
+        # H string via write_text has 1px trailing space.
+        # We place colon there. 
+        # Then we add 1px space.
+        # Then M.
+        # So width effectively: w_h (includes H's tail space) + 1 (tail space effectively used by colon? No, colon needs its own column)
+        # H_block [space] : [space] M_block
+        # w_h counts [H][space].
+        # So width = w_h + 1 (colon) + 1 (space) + w_m
         
-        # Let's compute x positions relative to a start 'x'
-        # H1: x
-        # H2: x + 6
-        # Colon: x + 12
-        # M1: x + 12 + 4? (Colon is usually 2px wide visual, plus spacing)
+        w_colon_area = 2 
+        total_w = w_h + w_colon_area + w_m
         
-        # Let's simply center it nicely.
-        start_x = 2
+        start_x = (self._display.width - total_w) // 2
         
         # Draw Hour
         cursor = self._display.write_text(start_x, 1, s_h, self.color)
         
         # Draw Colon
-        # Colon in 5x7 is usually width 5 (code returns 5 bytes).
-        # But visually it's centered. neodisplay generic font:
-        # ':' : [0x00, 0x36, 0x36, 0x00, 0x00]
-        # We can draw it "tight" if we want, or just use write_text for convenience
-        # if we are okay with the standard spacing.
-        # write_text returns next cursor position (x + width + 1)
-        
-        # Let's just overwrite the colon position manually to change color.
-        # If we print "12:00", the colon is the 3rd char.
-        # For simplicity:
-        
-        # Draw Colon
-        # 'space' between digits is 1px.
-        # Previous cursor includes 1px trailing space.
-        
-        # Adjust cursor slightly for colon visual balance? 
-        # Actually standard font spacing is fine for HH:MM.
-        
-        cursor = self._display.draw_char(cursor, 1, ":", self.colon_color)
+        self._draw_colon(cursor, 1, self.colon_color)
+        cursor += 2 # Advance past colon (1) and separation space (1)
         
         # Draw Minute
-        cursor = self._display.write_text(cursor, 1, s_m, self.color)
+        self._display.write_text(cursor, 1, s_m, self.color)
 
     def _draw_hh_mm_ss(self, h, m, s):
-        # Format: HH:MM ss
-        # This is tight on 32 pixels.
-        # We must use tight spacing.
+        # Format: HH:MM ss with tight packing
         
-        s_h = "{:02d}".format(h)
+        if self.twelve_hour:
+             s_h = "{:d}".format(h)
+        else:
+             s_h = "{:02d}".format(h)
         s_m = "{:02d}".format(m)
         s_s = "{:02d}".format(s)
         
-        # Layout strategy:
-        # Try to fit everything starting at x=0
+        # Calculate Widths
+        # H group
+        w_h = 0
+        for c in s_h:
+            w_h += (3 if c == '1' else 5)
+        w_h += len(s_h) - 1 # Spacings between H digits
         
-        x = 0
+        # M group
+        w_m = 0
+        for c in s_m:
+            w_m += (3 if c == '1' else 5)
+        w_m += len(s_m) - 1
+        
+        # S group (Small font 3x5, width 3)
+        w_s = 0
+        for c in s_s:
+            w_s += 3
+        w_s += len(s_s) - 1
+        
+        # Total Layout: H + space + colon + space + M + space + space + S
+        total_w = w_h + 1 + 1 + 1 + w_m + 2 + w_s
+        
+        start_x = (self._display.width - total_w) // 2
+        
+        x = start_x
         y_big = 1
-        y_small = 2 # Centered for 5-high font? 3x5 is 5 high. 8-5=3. y=1 means 1px top, 2px bottom. y=2 means 2px top, 1px bottom.
+        y_small = 2
         
-        # H1
-        x = self._draw_digit_tight(x, y_big, s_h[0], self.color)
-        x += 1 # 1px spacing
-        
-        # H2
-        x = self._draw_digit_tight(x, y_big, s_h[1], self.color)
-        
-        # Colon (Tight)
-        # 1px spacing before colon
+        # Draw H
+        for i, char in enumerate(s_h):
+            x = self._draw_digit_tight(x, y_big, char, self.color)
+            if i < len(s_h) - 1:
+                x += 1
+                
+        # Colon
         x += 1
-        # Draw 2px colon manually
-        self._display.pixel(x, y_big+1, self.colon_color)
-        self._display.pixel(x, y_big+4, self.colon_color) 
-        self._display.pixel(x+1, y_big+1, self.colon_color)
-        self._display.pixel(x+1, y_big+4, self.colon_color)
+        self._draw_colon(x, y_big, self.colon_color)
+        x += 2 # Colon(1) + Space(1)
+        
+        # Draw M
+        for i, char in enumerate(s_m):
+            x = self._draw_digit_tight(x, y_big, char, self.color)
+            if i < len(s_m) - 1:
+                x += 1
+                
+        # Gap
         x += 2
         
-        # M1
-        x += 1 # 1px spacing
-        x = self._draw_digit_tight(x, y_big, s_m[0], self.color)
-        
-        # M2
-        x += 1
-        x = self._draw_digit_tight(x, y_big, s_m[1], self.color)
-        
-        # Small Seconds
-        x += 2 # Extra spacing?
-        
-        # S1
-        x = self._display.draw_char(x, y_small, s_s[0], self.color, font=neodisplay.NeoDisplay.FONT_SMALL)
-        # S2
-        x = self._display.draw_char(x, y_small, s_s[1], self.color, font=neodisplay.NeoDisplay.FONT_SMALL)
+        # Draw S
+        for i, char in enumerate(s_s):
+            self._display.draw_char(x, y_small, char, self.color, font=neodisplay.NeoDisplay.FONT_SMALL)
+            x += 3 
+            if i < len(s_s) - 1:
+                x += 1
 
+    def _draw_colon(self, x, y, color):
+        # Draw single column colon
+        # Matches design of 5x7 colon (bits 1,2 and 4,5)
+        self._display.pixel(x, y+1, color)
+        self._display.pixel(x, y+2, color)
+        self._display.pixel(x, y+4, color)
+        self._display.pixel(x, y+5, color)
 
     def _draw_digit_tight(self, x, y, char, color):
-        # Determine width of digit
-        # 1 is 3px wide. Others 5px.
-        width = 5
-        if char == '1':
-            width = 3
-            
-        # Standard draw_char uses full 5 bytes for everything. 
-        # We'll re-implement a simple drawer that knows '1' is skinny or just skips empty columns?
-        # A simple "draw_char" that returns actual visual width would be better.
+        # Fetch packed integer from tuple
+        idx = ord(char) - 32
+        if idx < 0 or idx >= len(neodisplay.FONT_5x7):
+            idx = ord('?') - 32
         
-        # For now, let's just use the display's byte data but skip leading/trailing zeros?
-        # neodisplay FONT_5x7['1'] is 00 42 7F 40 00.
-        # That's 1px padding, 3px data, 1px padding.
-        # If we want TIGHT packing, we should strip that padding.
+        val = neodisplay.FONT_5x7[idx]
         
-        glyph = neodisplay.FONT_5x7.get(char, neodisplay.FONT_5x7['?'])
+        # Unpack 5 bytes
+        glyph = [
+            (val >> 32) & 0xFF,
+            (val >> 24) & 0xFF,
+            (val >> 16) & 0xFF,
+            (val >> 8) & 0xFF,
+            val & 0xFF
+        ]
         
-        # Find start and end columns that are not 0
+        # Calculate visual bounds
         start_col = 0
         end_col = len(glyph)
         
-        # Strip leading
         while start_col < end_col and glyph[start_col] == 0:
             start_col += 1
-            
-        # Strip trailing
         while end_col > start_col and glyph[end_col-1] == 0:
             end_col -= 1
             
