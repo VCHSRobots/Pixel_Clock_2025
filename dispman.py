@@ -223,6 +223,21 @@ class DisplayManager:
         self._queue.insert(0, anim)
         self._work_event.set()  # wake runner immediately
 
+    def stop_foreground(self):
+        """
+        Stop any running foreground animation and clear the queue.
+        Returns to default animation immediately.
+        """
+        # Clear pending foreground animations
+        self._queue.clear()
+
+        # Cancel current foreground task if running
+        if self.current_task is not None:
+            self.current_task.cancel()
+        
+        # The runner loop will catch the cancellation, 
+        # cleanup the current animation, and resume the default animation.
+
     def stop(self):
         """
         Stop the manager and all animations.

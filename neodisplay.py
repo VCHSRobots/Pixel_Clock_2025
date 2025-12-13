@@ -406,6 +406,7 @@ class NeoDisplay:
         cursor_x = x
         for char in text:
             cursor_x = self.draw_char(cursor_x, y, char, color, font)
+        return cursor_x
 
 def get_display():
     """Get the singleton instance of the display."""

@@ -1,10 +1,14 @@
 import uasyncio as asyncio
 import neodisplay
 import dispman  
+import time_display  
 
 PIN_NUM = 16  # Change as needed
 
-display = neodisplay.NeoDisplay(PIN_NUM, brightness=0.1)
+if neodisplay.NeoDisplay.inst() is None:
+    display = neodisplay.NeoDisplay(PIN_NUM, brightness=0.1)
+else:
+    display = neodisplay.NeoDisplay.inst()
 
 async def anim_scroll_text():
     """Scrolls text with punctuation."""
@@ -90,20 +94,47 @@ async def main():
     display = neodisplay.get_display()
     display.brightness = 1.0
 
-    default_anim = dispman.BouncingDotAnimation(None, color=(0, 10, 0))
+    # Default animation is the Clock (TimeDisplay)
+    # Singleton usage
+    clock = time_display.TimeDisplay.inst()
+    # Ensure default defaults
+    clock.set_mode(time_display.HH_MM)
+    clock.set_color(neodisplay.WHITE)
+    
+    mgr = dispman.DisplayManager(default_anim=clock)
+    
+    # 1. Run Clock (HH:MM) for a few seconds
+    print("Showing Clock (HH:MM)...")
+    await asyncio.sleep(5)
 
-    mgr = dispman.DisplayManager(default_anim=default_anim)
+    # 2. Change Clock Mode to HH_MM_SS via API
+    print("Changing Clock Mode to HH:MM SS...")
+    clock.set_mode(time_display.HH_MM_SS)
+    clock.set_color(neodisplay.CYAN)
+    
+    # Let that run for a bit
+    await asyncio.sleep(5)
+    
+    # 3. Trigger "Pop up" Scrolling Text
+    print("Queueing Scrolling Text Popup...")
+    from animations import ScrollingText
+    scroll_anim = ScrollingText("Hello World!", color=neodisplay.MAGENTA, loops=1)
+    mgr.queue_for_play(scroll_anim)
+  
+    
+    # Text finishes, system automatically returns to Clock.
+    await mgr.wait_idle()  
     await asyncio.sleep(5)
 
     # later, schedule a one-shot animation:
     special = dispman.BouncingDotAnimation(None, color=(50, 50, 0))
     mgr.queue_for_play(special)
-    await asyncio.sleep(5)
-
-    # or interrupt immediately:
-    urgent = dispman.BouncingDotAnimation(None, color=(50, 0, 50))
-    mgr.play_immediate(urgent)
-
+    
+    # Let it run for 2 seconds then kill it
+    await asyncio.sleep(2)
+    print("Testing stop_foreground()...")
+    mgr.stop_foreground()
+    
     # keep other tasks running, web server, etc.
     while True:
         await asyncio.sleep(1)

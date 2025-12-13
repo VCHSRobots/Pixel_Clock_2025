@@ -206,3 +206,12 @@ def test_colored_scroll():
         asyncio.run(_run_test())
     except KeyboardInterrupt:
         print("Interrupted.")
+
+def start_main():
+    """Start the main application loop."""
+    print("Starting Main Application...")
+    import main
+    try:
+        asyncio.run(main.main())
+    except KeyboardInterrupt:
+        print("Main Application Stopped.")
