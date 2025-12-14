@@ -25,6 +25,9 @@ async function def_fetch() {
                 document.getElementById('brightness').value = Math.round(data.brightness * 100);
                 document.getElementById('color-digits').value = data.color;
                 document.getElementById('color-colon').value = data.colon_color;
+                if (data.seconds_color) {
+                    document.getElementById('color-seconds').value = data.seconds_color;
+                }
                 document.getElementById('format-mode').value = data.mode;
                 document.getElementById('twelve-hour').value = data.twelve_hour.toString();
             }
@@ -56,6 +59,7 @@ async function saveSettings() {
         brightness: document.getElementById('brightness').value / 100,
         color: document.getElementById('color-digits').value,
         colon_color: document.getElementById('color-colon').value,
+        seconds_color: document.getElementById('color-seconds').value,
         mode: parseInt(document.getElementById('format-mode').value),
         twelve_hour: document.getElementById('twelve-hour').value === 'true'
     };

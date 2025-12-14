@@ -25,7 +25,7 @@ class TimeDisplay(BaseAnimation):
             cls._instance = cls()
         return cls._instance
 
-    def __init__(self, mode=HH_MM, color=neodisplay.WHITE, colon_color=neodisplay.WHITE, twelve_hour=True):
+    def __init__(self, mode=HH_MM, color=neodisplay.WHITE, colon_color=neodisplay.WHITE, seconds_color=None, twelve_hour=True):
         super().__init__()
         if TimeDisplay._instance is None:
             TimeDisplay._instance = self
@@ -33,6 +33,7 @@ class TimeDisplay(BaseAnimation):
         self.mode = mode
         self.color = color
         self.colon_color = colon_color
+        self.seconds_color = seconds_color if seconds_color is not None else color
         self.twelve_hour = twelve_hour
 
     def set_mode(self, mode):
@@ -43,6 +44,9 @@ class TimeDisplay(BaseAnimation):
         
     def set_colon_color(self, color):
         self.colon_color = color
+        
+    def set_seconds_color(self, color):
+        self.seconds_color = color
         
     def set_12hr(self, is_12hr):
         self.twelve_hour = is_12hr
@@ -175,17 +179,15 @@ class TimeDisplay(BaseAnimation):
         
         # Draw S
         for i, char in enumerate(s_s):
-            self._display.draw_char(x, y_small, char, self.color, font=neodisplay.NeoDisplay.FONT_SMALL)
+            self._display.draw_char(x, y_small, char, self.seconds_color, font=neodisplay.NeoDisplay.FONT_SMALL)
             x += 3 
             if i < len(s_s) - 1:
                 x += 1
 
     def _draw_colon(self, x, y, color):
         # Draw single column colon
-        # Matches design of 5x7 colon (bits 1,2 and 4,5)
-        self._display.pixel(x, y+1, color)
+        # New design: 2 pixels total
         self._display.pixel(x, y+2, color)
-        self._display.pixel(x, y+4, color)
         self._display.pixel(x, y+5, color)
 
     def _draw_digit_tight(self, x, y, char, color):

@@ -18,9 +18,10 @@ def hex_to_rgb(hex_str):
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
 class WebServer:
-    def __init__(self, display_manager, time_display):
+    def __init__(self, display_manager, time_display, settings_manager):
         self.dm = display_manager
         self.td = time_display
+        self.sm = settings_manager
         
     async def start(self):
         # Connect to WiFi
@@ -58,11 +59,11 @@ class WebServer:
             # Simple HTTP Request Parsing
             request_line = await reader.readline()
             if not request_line:
-                print("Web Server: Client disconnected.")
+                #print("Web Server: Client disconnected.")
                 writer.close()
                 return
 
-            print("Web Server: Request: ", request_line.decode().strip())
+            #print("Web Server: Request: ", request_line.decode().strip())
 
             try:
                 method, path, proto = request_line.decode().strip().split()
@@ -140,6 +141,7 @@ class WebServer:
             "brightness": neodisplay.get_display().brightness(),
             "color": rgb_to_hex(self.td.color),
             "colon_color": rgb_to_hex(self.td.colon_color),
+            "seconds_color": rgb_to_hex(self.td.seconds_color),
             "mode": self.td.mode,
             "twelve_hour": self.td.twelve_hour
         }
@@ -154,22 +156,45 @@ class WebServer:
     async def serve_settings(self, writer, body):
         try:
             data = json.loads(body)
+            updates = {}
             
             # Brightness
             if "brightness" in data:
-                neodisplay.get_display().brightness(float(data["brightness"]))
-                
+                # brightness is global on display
+                brightness = float(data["brightness"])
+                neodisplay.get_display().brightness(brightness)
+                updates["brightness"] = brightness
+            
             # Colors
             if "color" in data:
-                self.td.set_color(hex_to_rgb(data["color"]))
+                c = hex_to_rgb(data["color"])
+                self.td.set_color(c)
+                updates["digit_color"] = c
+                
             if "colon_color" in data:
-                self.td.set_colon_color(hex_to_rgb(data["colon_color"]))
+                c = hex_to_rgb(data["colon_color"])
+                self.td.set_colon_color(c)
+                updates["colon_color"] = c
+
+            if "seconds_color" in data:
+                c = hex_to_rgb(data["seconds_color"])
+                self.td.set_seconds_color(c)
+                updates["seconds_color"] = c
                 
             # Mode
             if "mode" in data:
-                self.td.set_mode(int(data["mode"]))
+                m = int(data["mode"])
+                self.td.set_mode(m)
+                updates["mode"] = m
+                
             if "twelve_hour" in data:
-                self.td.set_12hr(bool(data["twelve_hour"]))
+                th = bool(data["twelve_hour"])
+                self.td.set_12hr(th)
+                updates["12_hour_mode"] = th
+            
+            # Save all at once
+            if updates:
+                self.sm.update(updates)
                 
             writer.write("HTTP/1.0 200 OK\r\n\r\n")
             writer.write('{"status":"ok"}')

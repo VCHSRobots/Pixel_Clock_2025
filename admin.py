@@ -304,6 +304,8 @@ def test_rainbow(duration=10, speed=2, scale=5, brightness=0.2):
 def start_main():
     """Start the main application loop."""
     print("Starting Main Application...")
+    import gc
+    gc.collect()
     import main
     try:
         asyncio.run(main.main())
