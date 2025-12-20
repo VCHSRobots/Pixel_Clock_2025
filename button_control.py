@@ -1,10 +1,12 @@
 import uasyncio as asyncio
 import time
 from machine import Pin
-import network
-import config
+
 import neodisplay
 import animations
+import dispman
+import time_display
+import settings_manager
 
 # Button Constants
 BUTTON_PIN = 17 
@@ -18,11 +20,18 @@ BRIGHTNESS_STEP = 0.05
 BRIGHTNESS_DELAY_MS = 100
 
 class ButtonController:
-    def __init__(self, display_manager, time_display, settings_manager):
+    _instance = None
+
+    @classmethod
+    def inst(cls):
+        return cls._instance
+
+    def __init__(self):
+        if ButtonController._instance is not None:
+            raise RuntimeError("ButtonController already initialized")
+        ButtonController._instance = self
+        
         self.pin = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
-        self.dm = display_manager
-        self.td = time_display
-        self.sm = settings_manager
         self._brightness_direction = 1 # 1 for up, -1 for down
 
     async def start(self):
@@ -48,29 +57,38 @@ class ButtonController:
                         elif duration >= LONG_PRESS_MS:
                              print("Button: Long Press -> Brightness Mode")
                              state = 'BRIGHTNESS_WAIT'
-                             anim = animations.ScrollingText("BRT MODE", color=neodisplay.YELLOW, loops=1)
-                             self.dm.play_immediate(anim)
+                             # Infinite message
+                             anim = animations.MessageDisplay("Adj BRT", duration=0, color=neodisplay.YELLOW)
+                             dispman.get_display_manager().play_immediate(anim)
+                             last_activity_ticks = time.ticks_ms()
                         else:
                              print("Button: Short Press -> Status")
                              await self._trigger_status()
                     
             elif state == 'BRIGHTNESS_WAIT':
-                # We are in brightness mode. Waiting for the adjustment press.
-                # If user doesn't press for a while, we should probably timeout? 
-                # For now, let's just wait indefinitely or until next press.
-                
+                # Check for timeout (10 seconds)
+                if time.ticks_diff(time.ticks_ms(), last_activity_ticks) > 10000:
+                    print("Button: Timeout -> Exit Brightness Mode")
+                    state = 'IDLE'
+                    dispman.get_display_manager().stop_foreground() # Stop the "Adj BRT" message
+                    continue
+
                 # Check for press
                 if not self.pin.value():
                      await asyncio.sleep_ms(DEBOUNCE_MS)
                      if not self.pin.value():
                          # This is the adjustment press!
                          print("Button: Adjustment Press")
+                         last_activity_ticks = time.ticks_ms() # Reset timeout
+                         
                          await self._adjust_brightness_loop()
+                         
                          # After adjustment loop returns (user released), we save and exit
                          state = 'IDLE'
                          self._save_brightness()
-                         anim = animations.ScrollingText("SAVED", color=neodisplay.GREEN, loops=1)
-                         self.dm.play_immediate(anim)
+                         # Static "Saved" message for 2 seconds
+                         anim = animations.MessageDisplay("Saved", duration=2.0, color=neodisplay.GREEN)
+                         dispman.get_display_manager().play_immediate(anim)
 
             await asyncio.sleep_ms(20)
 
@@ -127,28 +145,38 @@ class ButtonController:
 
     def _save_brightness(self):
         val = neodisplay.get_display().brightness()
-        self.sm.update({"brightness": val})
+        settings_manager.get_settings_manager().update({"brightness": val})
         print("Button: Settings Saved")
 
     async def _trigger_status(self):
-        wlan = network.WLAN(network.STA_IF)
-        status = wlan.status()
+        import netcomm
+        nm = netcomm.get_netcomm()
         
         text = ""
         color = neodisplay.BLUE
         
-        if status == 3 and wlan.isconnected(): # Connected
-            ip = wlan.ifconfig()[0]
-            text = f"IP: {ip}"
+        if nm.is_connected():
+            text = f"IP: {nm.get_ip()}"
         else:
-            text = f"No Conn: {config.SSID}"
+            text = "No Connection"
             color = neodisplay.RED
             
-        anim = animations.ScrollingText(text, color=color, loops=1)
-        self.dm.play_immediate(anim)
+        anim = animations.ScrollingText(text, color=color, loops=1, starting_x=10, pause_on_entry=3.0)
+        dispman.get_display_manager().play_immediate(anim)
 
     async def _trigger_setup(self):
         print("Button: Very Long Press -> Setup Mode")
-        anim = animations.ScrollingText("SETUP", color=neodisplay.MAGENTA, loops=3)
-        self.dm.play_immediate(anim)
+        display = neodisplay.get_display()
+        display.brightness(1.0)
+        anim = animations.MessageDisplay("SETUP", duration=5.0, color=neodisplay.MAGENTA)
+        dispman.get_display_manager().play_immediate(anim)
+        await anim.wait_for_finish()
+        display.brightness(0.05)
         # Setup is a stub for now. Use loops=3 to indicate 'mode' active for a bit then exit.
+
+def get_button_controller():
+    """Get the singleton instance. If not exists, create it."""
+    bc = ButtonController.inst()
+    if bc is None:
+        bc = ButtonController()
+    return bc

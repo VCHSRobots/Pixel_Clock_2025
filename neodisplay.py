@@ -336,6 +336,31 @@ class NeoDisplay:
             cursor_x = self.draw_char(cursor_x, y, char, color, font)
         return cursor_x
 
+    def draw_char_tight(self, x, y, char, color):
+        """Draw 0 or 1 chars tightly, using 4 spaces instead of 5. Large Font."""
+        if char == '1':
+            self.pixel(x + 1, y + 1, color)
+            self.pixel(x + 1, y + 6, color)
+            self.pixel(x + 2, y + 0, color)
+            self.pixel(x + 2, y + 1, color)
+            self.pixel(x + 2, y + 2, color)
+            self.pixel(x + 2, y + 3, color)
+            self.pixel(x + 2, y + 4, color)
+            self.pixel(x + 2, y + 5, color)
+            self.pixel(x + 2, y + 6, color)
+            self.pixel(x + 3, y + 6, color)
+            return x + 4
+        elif char == '0':
+            for i in range(7):
+                self.pixel(x, y + i, color)
+                self.pixel(x + 3, y + i, color)
+            self.pixel(x + 1, y + 0, color)
+            self.pixel(x + 2, y + 0, color)
+            self.pixel(x + 1, y + 5, color)
+            self.pixel(x + 2, y + 5, color)
+            return x + 4
+        return x
+
 def get_display():
     """Get the singleton instance of the display. Create it if it doesn't exist."""
     d = NeoDisplay.inst()

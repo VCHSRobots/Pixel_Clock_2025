@@ -2,20 +2,74 @@
 # Refactored to class-based design
 
 from machine import Pin, I2C, SoftI2C
+import persistent_logger
 import time
 
-class Clock:
+class RealTimeClock:
+    RTC_ADDR = 0x68
+    EEPROM_ADDR = 0x57
+    _instance = None
+
+    @classmethod
+    def inst(cls):
+        return cls._instance
+
     RTC_ADDR = 0x68
     EEPROM_ADDR = 0x57
 
-    def __init__(self, i2c=None, sda_pin=0, scl_pin=1):
+    def __init__(self, i2c=None):
+        if RealTimeClock._instance is not None:
+            raise RuntimeError("RealTimeClock already initialized")
+        RealTimeClock._instance = self
+
         if i2c:
             self.i2c = i2c
         else:
-            self.i2c = SoftI2C(Pin(scl_pin), Pin(sda_pin), freq=100_000)
+            # Auto-detect pins
+            # Candidates: (SDA, SCL)
+            # Version 1: GPIO 4, 5
+            # Version 2: GPIO 0, 1
+            # Assuming standard ordering (SDA, SCL) consistency or trying intuitive mappings
+            # Note: SoftI2C(scl, sda)
+            
+            candidates = [
+                (4, 5), # sda=4, scl=5
+                (0, 1)  # sda=0, scl=1
+            ]
+            
+            found = False
+            for sda_pin, scl_pin in candidates:
+                try:
+                    # SoftI2C takes (scl, sda) positional
+                    bus = SoftI2C(Pin(scl_pin), Pin(sda_pin), freq=100_000)
+                    devices = bus.scan()
+                    if self.RTC_ADDR in devices:
+                        print(f"RTC found on SDA={sda_pin}, SCL={scl_pin}")
+                        self.i2c = bus
+                        found = True
+                        break
+                except Exception as e:
+                    print(f"Failed to init I2C on SDA={sda_pin}, SCL={scl_pin}: {e}")
+            
+            if not found:
+                print("Warning: RTC not found on any default pins. Defaulting to SDA=0, SCL=1 without confirm.")
+                persistent_logger.log("RTC Error: DS3231 Hardware not found or pins incorrect")
+                # Fallback to avoid complete crash if unplugged, or raise error?
+                # User said "Modify rtc_module to automatically figure out..."
+                # If it determines "not found", we might want to just set a default to prevent 'self.i2c' attribute error later,
+                # or let it fail.
+                # I'll fall back to 0, 1.
+                self.i2c = SoftI2C(Pin(1), Pin(0), freq=100_000)
         
+        self.rtc_present = found
         self.last_write_time = None
         self.delay_start = None
+
+    def is_working(self):
+        """
+        Returns True if the RTC module is currently available and responding.
+        """
+        return self.rtc_present
 
     def _bcd2dec(self, bcd):
         """Convert binary coded decimal to decimal."""
@@ -169,3 +223,13 @@ class Clock:
         
         self.i2c.writeto(self.EEPROM_ADDR, addr_buf)
         return self.i2c.readfrom(self.EEPROM_ADDR, nbytes)
+
+def get_rtc(i2c=None):
+    """
+    Get the singleton instance of the RealTimeClock.
+    If it doesn't exist, create it (which will trigger auto-detection if i2c is None).
+    """
+    rtc = RealTimeClock.inst()
+    if rtc is None:
+        rtc = RealTimeClock(i2c)
+    return rtc

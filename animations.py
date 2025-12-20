@@ -2,6 +2,7 @@
 # Dec 2025
 
 import uasyncio as asyncio
+import time
 from dispman import BaseAnimation
 import neodisplay
 
@@ -9,13 +10,15 @@ class ScrollingText(BaseAnimation):
     """
     Scrolls text from right to left across the display.
     """
-    def __init__(self, text, color=neodisplay.WHITE, speed=0.1, font=None, loops=None):
+    def __init__(self, text, color=neodisplay.WHITE, speed=0.1, font=None, loops=None, starting_x=None, pause_on_entry=0.0):
         super().__init__()
         self.text = text
         self.color = color
         self.speed = speed
         self.font = font
         self.loops = loops # None or 0 = infinite
+        self.starting_x = starting_x
+        self.pause_on_entry = pause_on_entry
         
         # Calculate width immediately or in run? 
         # In run ensures we have display ref if it were ever dynamic, but it isn't really.
@@ -27,6 +30,8 @@ class ScrollingText(BaseAnimation):
             
         self.char_width = 6 if self.font == neodisplay.NeoDisplay.FONT_LARGE else 4
         self.total_width = len(text) * self.char_width
+        self.space_width = 1 # Assuming space between letters is handled in char_width? 
+        # Actually char_width 6 is 5px char + 1px space. So total_width is correct.
 
         # Y position centering
         if self.font == neodisplay.NeoDisplay.FONT_SMALL:
@@ -35,14 +40,17 @@ class ScrollingText(BaseAnimation):
              self.y_pos = 1
 
     async def run(self):
-        # Start off-screen right
-        start_x = self._display.width
+        # Start off-screen right or at specified position
+        width = self._display.width
+        start_x = self.starting_x if self.starting_x is not None else width
+        
         # End off-screen left
         end_x = -self.total_width
         
         loops_remaining = self.loops
         
         current_x = start_x
+        paused_this_loop = False
         
         while not self.stopped:
             if self.paused:
@@ -53,9 +61,22 @@ class ScrollingText(BaseAnimation):
             self._display.write_text(current_x, self.y_pos, self.text, self.color, font=self.font)
             self._display.show()
             
+            # Check for pause condition: last letter completely on display
+            # Right edge of text: current_x + self.total_width
+            # If right_edge <= width, it's fully on screen (or past it)
+            right_edge = current_x + self.total_width
+            
+            if self.pause_on_entry > 0 and not paused_this_loop and right_edge <= width:
+                # Pause!
+                await asyncio.sleep_ms(int(self.pause_on_entry * 1000))
+                # Stop after pause if requested
+                self.stop()
+                return
+            
             current_x -= 1
             if current_x < end_x:
                 current_x = start_x # Loop around
+                paused_this_loop = False # Reset pause flag for next loop
                 if loops_remaining is not None:
                     loops_remaining -= 1
                     if loops_remaining <= 0:
@@ -320,3 +341,50 @@ class Rainbow(BaseAnimation):
                 
             await asyncio.sleep_ms(10)
 
+
+class MessageDisplay(BaseAnimation):
+    """
+    Displays a static message for a duration.
+    """
+    def __init__(self, message, duration=2.0, color=neodisplay.WHITE, font=None):
+        super().__init__()
+        self.message = message
+        self.duration = duration
+        self.color = color
+        self.font = font
+        
+        if self.font is None:
+            self.font = neodisplay.NeoDisplay.FONT_LARGE
+            
+        # Y position centering
+        if self.font == neodisplay.NeoDisplay.FONT_SMALL:
+             self.y_pos = 2
+        else:
+             self.y_pos = 1
+
+    async def run(self):
+        start_time = time.time()
+        
+        while not self.stopped:
+            if self.paused:
+                await asyncio.sleep_ms(100)
+                continue
+            
+            self._display.fill(neodisplay.BLACK)
+            
+            # Draw message
+            if isinstance(self.message, str):
+                 self._display.write_text(0, self.y_pos, self.message, self.color, font=self.font)
+            else:
+                # Assume list of (char, color)
+                x = 0
+                for char, color in self.message:
+                    x = self._display.draw_char(x, self.y_pos, char, color, font=self.font)
+            
+            self._display.show()
+            
+            if self.duration > 0 and (time.time() - start_time > self.duration):
+                self.stop()
+                return
+                
+            await asyncio.sleep_ms(100)

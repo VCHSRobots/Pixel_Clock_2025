@@ -50,6 +50,11 @@ class BaseAnimation:
     def stopped(self):
         return self._stopped
 
+    async def wait_for_finish(self):
+        """Wait until the animation has stopped."""
+        while not self.stopped:
+            await asyncio.sleep_ms(100)
+
     async def run(self):
         """
         Override in subclasses.
@@ -94,9 +99,22 @@ class DisplayManager:
         mgr.play_immediate(urgent)
     """
 
-    def __init__(self, default_anim=None):
+    _instance = None
+
+    @classmethod
+    def inst(cls):
+        return cls._instance
+
+    def __init__(self):
+        if DisplayManager._instance is not None:
+             raise RuntimeError("DisplayManager already initialized")
+        DisplayManager._instance = self
+
         # default_anim must be an INSTANCE of BaseAnimation (or subclass)
-        self.default_anim = default_anim
+        # Default to Slow Blue Bouncing Box
+        
+        import animations
+        self.default_anim = animations.BouncingBox(color=neodisplay.BLUE, speed=0.1)
         self._default_task = None
 
         # Queue of animation objects (each must be an instance)
@@ -163,7 +181,7 @@ class DisplayManager:
                 pass
             except Exception as e:
                 print("Default animation error during shutdown:", e)
-
+    
     async def _run_anim(self, anim):
         """Run a single foreground animation until it finishes or is cancelled."""
         # Make sure it is not paused when starting
@@ -189,6 +207,24 @@ class DisplayManager:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def set_background(self, anim):
+        """
+        Sets the background (default) animation.
+        This replaces the running background animation immediately.
+        """
+        # Stop existing default
+        if self.default_anim is not None:
+            self.default_anim.stop()
+            
+        if self._default_task is not None:
+            self._default_task.cancel()
+            self._default_task = None
+            
+        self.default_anim = anim
+        # Using _work_event will wake the runner to checking status
+        # If queue is empty, runner will pick up new default immediately
+        self._work_event.set()
 
     def queue_for_play(self, anim):
         """
@@ -262,6 +298,13 @@ class DisplayManager:
         """
         while self._queue or self.current_task is not None:
             await asyncio.sleep_ms(10)
+
+def get_display_manager():
+    """Get the singleton instance. Create if not exists."""
+    dm = DisplayManager.inst()
+    if dm is None:
+        dm = DisplayManager()
+    return dm
 
 
 # ---------------------------------------------------------------------------

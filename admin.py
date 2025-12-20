@@ -108,7 +108,7 @@ def test_manager():
     async def _test():
         print("Initializing Logic Manager...")
         default_anim = BouncingBox(color=neodisplay.YELLOW, size=2, speed=0.01)
-        mgr = DisplayManager(default_anim)
+        mgr = dispman.get_display_manager(default_anim)
         await asyncio.sleep(4)
         
         print("1. Queueing 2 messages (ScrollingText loops=1)...")
@@ -141,7 +141,7 @@ def test_animations():
     d = neodisplay.get_display()
     # Mock default animation? No, just rely on foreground for test
     async def _run_tests():
-        mgr = DisplayManager()
+        mgr = dispman.get_display_manager()
         print("1. Playing ScrollingText (queue, loops=1)...")
         anim1 = ScrollingText("Hello World!", color=neodisplay.MAGENTA, speed=0.08, loops=1)
         mgr.queue_for_play(anim1)
@@ -174,7 +174,8 @@ def test_colored_scroll():
     d = neodisplay.get_display()
     
     async def _run_test():
-        mgr = DisplayManager()
+        mgr = dispman.get_display_manager()
+        
         
         print("Building colored string...")
         sb = ColorStringBuilder()
@@ -206,7 +207,7 @@ def test_pulse(color=neodisplay.RED, count=5):
     from animations import Pulse
        
     async def _run():
-        mgr = DisplayManager()
+        mgr = dispman.get_display_manager()
         print(f"Testing Pulse (count={count})...")
         # Pulse doesn't have a 'loops' count in __init__, so we play it and wait or check implementation.
         # Looking at animations.py, Pulse loop is "while not self.stopped".
@@ -244,7 +245,7 @@ def test_bouncing_box(color=neodisplay.BLUE, size=2, duration=10):
     from animations import BouncingBox
     
     async def _run():
-        mgr = DisplayManager()
+        mgr = dispman.get_display_manager()
         print(f"Testing BouncingBox for {duration} seconds...")
         anim = BouncingBox(color=color, size=size, speed=0.05)
         mgr.play_immediate(anim)
@@ -265,7 +266,7 @@ def test_scrolling_text(text="Hello World", color=neodisplay.CYAN, loops=2):
     from animations import ScrollingText
     
     async def _run():
-        mgr = DisplayManager()
+        mgr = dispman.get_display_manager()
         print(f"Testing ScrollingText: '{text}' (loops={loops})...")
         anim = ScrollingText(text, color=color, speed=0.08, loops=loops)
         mgr.queue_for_play(anim)
@@ -286,7 +287,7 @@ def test_rainbow(duration=10, speed=2, scale=5, brightness=0.2):
     from animations import Rainbow  
     
     async def _run():
-        mgr = DisplayManager()
+        mgr = dispman.get_display_manager()
         print(f"Testing Rainbow for {duration} seconds...")
         anim = Rainbow(speed=speed, scale=scale, brightness=brightness)
         mgr.play_immediate(anim)
@@ -311,3 +312,136 @@ def start_main():
         asyncio.run(main.main())
     except KeyboardInterrupt:
         print("Main Application Stopped.")
+
+def test_message(msg="Hi!", duration=3, color=neodisplay.GREEN):
+    """Test MessageDisplay animation."""
+    from dispman import DisplayManager
+    from animations import MessageDisplay
+    
+    async def _run():
+        mgr = dispman.get_display_manager()
+        print(f"Testing MessageDisplay: '{msg}' for {duration}s...")
+        
+        # Test 1: Plain string
+        anim = MessageDisplay(msg, duration=duration, color=color)
+        mgr.play_immediate(anim)
+        await mgr.wait_idle()
+        
+        print("Test 1 Done.")
+        await asyncio.sleep(1)
+        
+        # Test 2: Colored list (manual construction for test)
+        print("Testing Colored Message...")
+        colored_msg = [
+            ('H', neodisplay.RED),
+            ('e', neodisplay.ORANGE),
+            ('l', neodisplay.YELLOW),
+            ('l', neodisplay.GREEN),
+            ('o', neodisplay.BLUE)
+        ]
+        anim2 = MessageDisplay(colored_msg, duration=3)
+        mgr.queue_for_play(anim2)
+        await mgr.wait_idle()
+        
+        print("Message Test Complete.")
+        mgr.stop()
+
+    try:
+        asyncio.run(_run())
+    except KeyboardInterrupt:
+        print("Interrupted.")
+
+def reset_rtc():
+    """Resets the External RTC (DS3231) to 2000-01-01 00:00:00."""
+    try:
+        import rtc_module
+        rtc = rtc_module.get_rtc()
+        if not rtc.is_working():
+            print("RTC Module Not Detected!")
+            return
+            
+        # (year, month, day, hour, minute, second, weekday, yearday)
+        # 2000-01-01 was Saturday (5? 6?)
+        # Let's verify weekday for 2000-01-01.
+        # Python: Monday=0. Saturday=5.
+        
+        # Reset to Midnight Jan 1 2000
+        tm = (2000, 1, 1, 0, 0, 0, 5, 1)
+        
+        rtc.set_time(tm)
+        print("RTC Reset to 2000-01-01 00:00:00.")
+        
+        # Verify
+        check = rtc.get_time()
+        print(f"RTC Verification Read: {check}")
+        
+    except Exception as e:
+        print(f"Failed to reset RTC: {e}")
+
+def test_ntp():
+    """Test NTP retrieval without setting RTC."""
+    import netcomm
+    import ntptime
+    import time
+    
+    nc = netcomm.get_netcomm()
+    if not nc.is_connected():
+        print("Network not connected. Status:", nc.get_status_str())
+        
+    try:
+        print("Querying NTP (pool.ntp.org)...")
+        t = ntptime.get_ntp_time()
+        print(f"NTP Epoch: {t}")
+        
+        tm = time.localtime(t)
+        # year, month, day, hour, minute, second, weekday, yearday
+        print(f"NTP Localtime (UTC): {tm[0]}-{tm[1]:02d}-{tm[2]:02d} {tm[3]:02d}:{tm[4]:02d}:{tm[5]:02d}")
+    except Exception as e:
+        print(f"NTP Failed: {e}")
+
+def debug_time_calc():
+    """Debug time calculation pipeline."""
+    import time
+    import rtc_module
+    import settings_manager
+    
+    rtc = rtc_module.get_rtc()
+    settings = settings_manager.get_settings_manager()
+    
+    # 1. RTC Read
+    t_rtc = rtc.get_time()
+    print(f"1. RTC Tuples (UTC): {t_rtc}")
+    
+    # 2. Mktime
+    try:
+        utc_seconds = time.mktime(t_rtc)
+        print(f"2. UTC Seconds: {utc_seconds}")
+    except Exception as e:
+        print(f"2. Mktime Failed: {e}")
+        return
+
+    # 3. Offset
+    offset = settings.get("timezone_offset", -8)
+    print(f"3. Offset: {offset}")
+    
+    local_seconds = utc_seconds + (offset * 3600)
+    print(f"4. Local Seconds (Standard): {local_seconds}")
+    
+    # 4. DST
+    # Copy _is_dst_us logic briefly or test it
+    t = time.localtime(local_seconds)
+    print(f"5. Local Tuple (Standard): {t}")
+    
+    # DST Check
+    # We need to access TimeKeeper's logic, or replicate it
+    import time_keeper
+    tk = time_keeper.get_time_keeper()
+    is_dst = tk._is_dst_us(local_seconds)
+    print(f"6. Is DST? {is_dst}")
+    
+    if is_dst:
+        local_seconds += 3600
+        print(f"7. Local Seconds (DST): {local_seconds}")
+        
+    final_t = time.localtime(local_seconds)
+    print(f"8. Final Tuple: {final_t}")

@@ -1,8 +1,8 @@
 
 function log(msg) {
-    const el = document.getElementById('status-log');
-    el.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
-    el.scrollTop = el.scrollHeight;
+    // Client side logging now just goes to console, 
+    // UI shows persistent server logs.
+    console.log(`[Client] ${msg}`);
 }
 
 async function def_fetch() {
@@ -30,8 +30,22 @@ async function def_fetch() {
                 }
                 document.getElementById('format-mode').value = data.mode;
                 document.getElementById('twelve-hour').value = data.twelve_hour.toString();
+                if (data.timezone_offset !== undefined) {
+                    document.getElementById('timezone-offset').value = data.timezone_offset;
+                }
             }
         }
+
+        // Update persistent logs
+        if (data.logs) {
+            const logEl = document.getElementById('status-log');
+            if (data.logs.length > 0) {
+                logEl.innerHTML = data.logs.join('<br>');
+            } else {
+                logEl.innerHTML = "[System] No persistent logs found.";
+            }
+        }
+
     } catch (e) {
         console.error(e);
     }
@@ -61,7 +75,8 @@ async function saveSettings() {
         colon_color: document.getElementById('color-colon').value,
         seconds_color: document.getElementById('color-seconds').value,
         mode: parseInt(document.getElementById('format-mode').value),
-        twelve_hour: document.getElementById('twelve-hour').value === 'true'
+        twelve_hour: document.getElementById('twelve-hour').value === 'true',
+        timezone_offset: parseInt(document.getElementById('timezone-offset').value)
     };
 
     log('Saving settings...');

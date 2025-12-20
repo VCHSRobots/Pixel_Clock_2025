@@ -21,20 +21,19 @@ class TimeDisplay(BaseAnimation):
 
     @classmethod
     def inst(cls):
-        if cls._instance is None:
-            cls._instance = cls()
         return cls._instance
 
-    def __init__(self, mode=HH_MM, color=neodisplay.WHITE, colon_color=neodisplay.WHITE, seconds_color=None, twelve_hour=True):
+    def __init__(self):
         super().__init__()
-        if TimeDisplay._instance is None:
-            TimeDisplay._instance = self
+        if TimeDisplay._instance is not None:
+            raise RuntimeError("TimeDisplay already initialized")
+        TimeDisplay._instance = self
             
-        self.mode = mode
-        self.color = color
-        self.colon_color = colon_color
-        self.seconds_color = seconds_color if seconds_color is not None else color
-        self.twelve_hour = twelve_hour
+        self.mode = HH_MM
+        self.color = neodisplay.WHITE
+        self.colon_color = neodisplay.WHITE
+        self.seconds_color = neodisplay.WHITE
+        self.twelve_hour = True
 
     def set_mode(self, mode):
         self.mode = mode
@@ -64,7 +63,14 @@ class TimeDisplay(BaseAnimation):
             await asyncio.sleep_ms(200)
 
     def _draw(self):
-        h, m, s = time_keeper.get_time()
+        t = time_keeper.get_time()
+        
+        if isinstance(t, str):
+            self._display.fill(neodisplay.BLACK)
+            self._draw_message(t)
+            return
+            
+        h, m, s = t
         
         # 12-hour conversion
         if self.twelve_hour:
@@ -80,115 +86,74 @@ class TimeDisplay(BaseAnimation):
         elif self.mode == HH_MM_SS:
             self._draw_hh_mm_ss(h, m, s)
 
+    def _draw_message(self, text):
+        # Draw text centered using small font (3x5)
+        # Width per char is 3 pixels + 1 spacing = 4 pixels
+        width = len(text) * 4 - 1
+        x = (self._display.width - width) // 2
+        # Center vertically: Height is 5. Display height is 8.
+        y = 1 
+        
+        self._display.write_text(x, y, text, neodisplay.RED, font=neodisplay.NeoDisplay.FONT_SMALL)
+
     def _draw_hh_mm(self, h, m):
         # Format: HH:MM centered
         
         if self.twelve_hour:
-             s_h = "{:d}".format(h)
+            s_h = "{:d}".format(h)
         else:
-             s_h = "{:02d}".format(h)
+            s_h = "{:02d}".format(h)
         s_m = "{:02d}".format(m)
         
-        # Width Calculation
-        # write_text char width is 6 (5 + 1 spacing)
-        w_h = len(s_h) * 6
-        w_m = len(s_m) * 6
-        
-        # Colon space: 1px colon + 1px spacing before (implicit in H?) + 1px spacing after
-        # H string via write_text has 1px trailing space.
-        # We place colon there. 
-        # Then we add 1px space.
-        # Then M.
-        # So width effectively: w_h (includes H's tail space) + 1 (tail space effectively used by colon? No, colon needs its own column)
-        # H_block [space] : [space] M_block
-        # w_h counts [H][space].
-        # So width = w_h + 1 (colon) + 1 (space) + w_m
-        
-        w_colon_area = 2 
-        total_w = w_h + w_colon_area + w_m
-        
-        start_x = (self._display.width - total_w) // 2
-        
-        # Draw Hour
-        cursor = self._display.write_text(start_x, 1, s_h, self.color)
+        # Fix the placement of the digits so that the display doesn't jump around. 
+
+        ix0 = 3
+        if len(s_h) == 1: ix0 = 9
+        self._display.write_text(ix0, 1, s_h, self.color)
         
         # Draw Colon
-        self._draw_colon(cursor, 1, self.colon_color)
-        cursor += 2 # Advance past colon (1) and separation space (1)
+        self._draw_colon(15, 1, self.colon_color)
         
         # Draw Minute
-        self._display.write_text(cursor, 1, s_m, self.color)
+        self._display.write_text(17, 1, s_m, self.color)
 
     def _draw_hh_mm_ss(self, h, m, s):
         # Format: HH:MM ss with tight packing
         
         if self.twelve_hour:
-             s_h = "{:d}".format(h)
+            s_h = "{:d}".format(h)
         else:
-             s_h = "{:02d}".format(h)
+            s_h = "{:02d}".format(h)
         s_m = "{:02d}".format(m)
         s_s = "{:02d}".format(s)
-        
-        # Calculate Widths
-        # H group
-        w_h = 0
-        for c in s_h:
-            w_h += (3 if c == '1' else 5)
-        w_h += len(s_h) - 1 # Spacings between H digits
-        
-        # M group
-        w_m = 0
-        for c in s_m:
-            w_m += (3 if c == '1' else 5)
-        w_m += len(s_m) - 1
-        
-        # S group (Small font 3x5, width 3)
-        w_s = 0
-        for c in s_s:
-            w_s += 3
-        w_s += len(s_s) - 1
-        
-        # Total Layout: H + space + colon + space + M + space + space + S
-        total_w = w_h + 1 + 1 + 1 + w_m + 2 + w_s
-        
-        start_x = (self._display.width - total_w) // 2
-        
-        x = start_x
-        y_big = 1
-        y_small = 2
-        
+               
         # Draw H
-        for i, char in enumerate(s_h):
-            x = self._draw_digit_tight(x, y_big, char, self.color)
-            if i < len(s_h) - 1:
-                x += 1
+        if len(s_h) == 1:
+            self._display.draw_char(5, 1, s_h[0], self.color)
+        else:
+            self._display.draw_char_tight(0, 1, s_h[0], self.color)
+            self._display.draw_char(5, 1, s_h[1], self.color)   
                 
         # Colon
-        x += 1
-        self._draw_colon(x, y_big, self.colon_color)
-        x += 2 # Colon(1) + Space(1)
+        self._draw_colon(11, 1, self.colon_color)
         
-        # Draw M
+        # Draw MM
+        x = 13
         for i, char in enumerate(s_m):
-            x = self._draw_digit_tight(x, y_big, char, self.color)
-            if i < len(s_m) - 1:
-                x += 1
-                
-        # Gap
-        x += 2
-        
-        # Draw S
+            self._display.draw_char(x, 1, char, self.color, font=neodisplay.NeoDisplay.FONT_LARGE)
+            x += 6
+
+        # Draw SS
+        x = 25
         for i, char in enumerate(s_s):
-            self._display.draw_char(x, y_small, char, self.seconds_color, font=neodisplay.NeoDisplay.FONT_SMALL)
-            x += 3 
-            if i < len(s_s) - 1:
-                x += 1
+            self._display.draw_char(x, 3, char, self.seconds_color, font=neodisplay.NeoDisplay.FONT_SMALL)
+            x += 4 
 
     def _draw_colon(self, x, y, color):
         # Draw single column colon
         # New design: 2 pixels total
-        self._display.pixel(x, y+2, color)
-        self._display.pixel(x, y+5, color)
+        self._display.pixel(x, 3, color)
+        self._display.pixel(x, 5, color)
 
     def _draw_digit_tight(self, x, y, char, color):
         # Fetch packed integer from tuple
@@ -223,7 +188,15 @@ class TimeDisplay(BaseAnimation):
             if draw_x >= self._display.width: break
             
             for row in range(7):
-                 if (col_byte >> row) & 1:
-                     self._display.pixel(draw_x, y + row, color)
-                     
+                if (col_byte >> row) & 1:
+                    self._display.pixel(draw_x, y + row, color)
+                    
         return x + (end_col - start_col)
+
+
+def get_time_display():
+    """Get the singleton instance. Create if not exists."""
+    td = TimeDisplay.inst()
+    if td is None:
+        td = TimeDisplay()
+    return td

@@ -2,13 +2,14 @@
 # Dec 2025
 
 import uasyncio as asyncio
-import network
+
 import json
-import socket
 import neodisplay
-import config
 import animations
-from time_display import TimeDisplay, HH_MM, HH_MM_SS
+import time_display
+import settings_manager
+import persistent_logger
+import dispman
 
 def rgb_to_hex(rgb):
     return "#{:02x}{:02x}{:02x}".format(rgb[0], rgb[1], rgb[2])
@@ -18,37 +19,20 @@ def hex_to_rgb(hex_str):
     return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
 
 class WebServer:
-    def __init__(self, display_manager, time_display, settings_manager):
-        self.dm = display_manager
-        self.td = time_display
-        self.sm = settings_manager
+    def __init__(self, device_name="NeoDisplay Clock"):
+        self.device_name = device_name
+        self.dm = dispman.get_display_manager()
+        self.td = time_display.get_time_display()
+        self.sm = settings_manager.get_settings_manager()
         
-    async def start(self):
-        # Connect to WiFi
-        wlan = network.WLAN(network.STA_IF)
-        wlan.active(True)
-        # Power management for responsiveness
+    def _get_logs(self):
         try:
-            wlan.config(pm = 0xa11140) 
-        except:
-            pass # Not all firmwares support this
+            return persistent_logger.get_logger().get_logs()
+        except Exception as e:
+            print(f"WebServer: Logic Error getting logs: {e}")
+            return []
 
-        print(f"Web Server: Connecting to {config.SSID}...")
-        wlan.connect(config.SSID, config.PASSWORD)
-        
-        max_wait = 20
-        while max_wait > 0:
-            if wlan.status() < 0 or wlan.status() >= 3:
-                break
-            max_wait -= 1
-            print('Waiting for connection...')
-            await asyncio.sleep(1)
-            
-        if wlan.status() != 3:
-             print("Web Server: Network connection failed.")
-        else:
-             print("Web Server: Connected. IP =", wlan.ifconfig()[0])
-             
+    async def start(self):
         # Start Server
         print("Web Server: Starting on port 80...")
         # backlog=5 ensures we can handle simultaneous connections in queue
@@ -67,6 +51,13 @@ class WebServer:
 
             try:
                 method, path, proto = request_line.decode().strip().split()
+                
+                # Log everything except high-frequency status polling
+                if path != "/api/status":
+                     addr = writer.get_extra_info('peername')
+                     ip = addr[0] if addr else "Unknown"
+                     print(f"WebServer: Request from {ip} : {method} {path}")
+                    
             except ValueError:
                 writer.close()
                 return
@@ -124,6 +115,12 @@ class WebServer:
         try:
             with open(filename, 'r') as f:
                 content = f.read()
+                
+            # Name Injection for HTML
+            if filename == "index.html":
+                content = content.replace("<title>NeoDisplay Clock Control</title>", f"<title>{self.device_name}</title>")
+                content = content.replace("<h1>NeoDisplay Clock</h1>", f"<h1>{self.device_name}</h1>")
+                
             writer.write("HTTP/1.0 200 OK\r\n")
             writer.write(f"Content-Type: {content_type}\r\n")
             writer.write("Connection: close\r\n")
@@ -134,16 +131,26 @@ class WebServer:
 
     async def serve_status(self, writer):
         import time_keeper
-        h, m, s = time_keeper.get_time()
+        t = time_keeper.get_time()
+        
+        if isinstance(t, str):
+            time_val = [0, 0, 0]
+            err_msg = t
+        else:
+            time_val = list(t)
+            err_msg = ""
         
         status = {
-            "time": [h, m, s],
+            "time": time_val,
+            "error": err_msg,
             "brightness": neodisplay.get_display().brightness(),
             "color": rgb_to_hex(self.td.color),
             "colon_color": rgb_to_hex(self.td.colon_color),
             "seconds_color": rgb_to_hex(self.td.seconds_color),
             "mode": self.td.mode,
-            "twelve_hour": self.td.twelve_hour
+            "twelve_hour": self.td.twelve_hour,
+            "timezone_offset": self.sm.get("timezone_offset", -8),
+            "logs": self._get_logs()
         }
         
         payload = json.dumps(status)
@@ -191,6 +198,12 @@ class WebServer:
                 th = bool(data["twelve_hour"])
                 self.td.set_12hr(th)
                 updates["12_hour_mode"] = th
+                
+            if "timezone_offset" in data:
+                try:
+                    updates["timezone_offset"] = int(data["timezone_offset"])
+                except:
+                    pass
             
             # Save all at once
             if updates:

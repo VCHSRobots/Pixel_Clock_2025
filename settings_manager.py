@@ -10,12 +10,23 @@ class SettingsManager:
         "digit_color": (255, 255, 255), # Default white
         "colon_color": (255, 255, 255),  # Default white
         "ssid": "",
-        "password": ""
+        "password": "",
+        "timezone_offset": -8 # Default PST
     }
     
     FILE_NAME = "settings.json"
+    _instance = None
+
+    @classmethod
+    def inst(cls):
+        """Returns the singleton instance of the settings manager."""
+        return cls._instance
 
     def __init__(self):
+        if SettingsManager._instance is not None:
+            raise RuntimeError("SettingsManager already initialized")
+        SettingsManager._instance = self
+        
         self.settings = self.DEFAULT_SETTINGS.copy()
         self.load()
 
@@ -34,6 +45,7 @@ class SettingsManager:
                 loaded = json.load(f)
                 # update current settings with loaded ones, preserving defaults for missing keys
                 self.settings.update(loaded)
+                print(f"SettingsManager: Loaded settings: {self.settings}")
         except (OSError, ValueError) as e:
             print(f"Error loading settings: {e}")
             # If load fails, we stick to current (default) settings
@@ -58,4 +70,15 @@ class SettingsManager:
     def update(self, new_settings):
         """Update multiple settings and save once."""
         self.settings.update(new_settings)
+        print(f"SettingsManager: Settings updated: {new_settings}")
         self.save()
+
+def get_settings_manager():
+    """Get the singleton instance of the settings manager. Create it if it doesn't exist."""
+    s = SettingsManager.inst()
+    if s is None:
+        try:
+            s = SettingsManager()
+        except RuntimeError:
+            s = SettingsManager.inst()
+    return s
