@@ -2,44 +2,77 @@
 
 A highly customizable, web-connected NeoPixel matrix clock powered by a Raspberry Pi Pico W. This project features accurate timekeeping via NTP and RTC, a responsive Web UI for configuration, robust alarm scheduling, and smooth animations.
 
-> [!IMPORTANT]
-> **Setup Mode** will be automatically entered for a new clock. For an existing clock, setup mode can be entered by a long button press (>10s), or by gaining access to the REPL (e.g. by connecting via USB and using [Thonny](https://thonny.org/)) and issuing these commands:
-> ```python
-> import admin as a
-> a.reset()
-> a.run()
-> ```
-> Older clocks can also be reset using these same commands with `admin`.
->
-> In **Setup Mode**, the clock creates its own WiFi Access Point. Connect to this network (no password required) using your phone or computer. You will be automatically redirected to a configuration page where you can select your local WiFi network, enter the password, and give your clock a custom name.
->
-> ### Getting Started
-> Once the clock connects to the internet, it will automatically synchronize the time. You can then modify the clock's settings through the web interface.
->
-> **Offline Mode**: If the clock cannot connect to WiFi but has valid time stored in its battery-backed RTC chip, it will continue to operate normally in offline mode.
-> 
-> **Using the Web Interface**: To access the web interface, you must first find the IP address of the clock. On power-up, or when you press the button for about 1 second, the clock will scroll its assigned IP address. Enter this IP into your browser to access the configuration page. From there, you can modify all settings (except the device name).
-> 
-> > [!NOTE]
-> > Older clocks do not have a button. To see the IP address scroll on these devices, simply cycle the power.
+## Installation & Upgrading
+
+### First-Time Installation
+If you are building a new clock from scratch:
+1.  **Flash MicroPython**: Install the latest MicroPython firmware for Raspberry Pi Pico W.
+2.  **Upload Code**: Connect via USB and use **Thonny** (or another REPL-capable IDE) to upload all project files (`.py`, `.html`, `.js`, etc.) to the root directory of the Pico W.
+3.  **Power On**: The clock will automatically enter **Setup Mode** on its first run (see below).
+
+### Upgrading an Existing Clock
+If you have an older clock or are updating the software:
+1.  **Connect via USB**: Plug the Pico W into your computer.
+2.  **Open Thonny**: Ensure you can access the files on the device.
+3.  **Wipe Old Files**: It is highly recommended to **delete all existing files** on the device to ensure a clean text.
+    - You can do this manually in the file explorer or via REPL.
+4.  **Upload New Code**: Upload the new set of files.
+5.  **Restart**: Reset the board. If `ssid.json` was deleted, it will enter Setup Mode.
+
+## Setup & Configuration
+
+### Startup Behavior
+- **Setup Mode**: Automatically entered ONLY if `ssid.json` is missing **AND** the system time is invalid (e.g., fresh install or RTC battery failure).
+- **Offline Mode**: If `ssid.json` is missing but the time is valid (RTC backup), the clock enters Offline Mode immediately.
+- **Normal Operation**: Connects to the saved WiFi network found in `ssid.json`.
+
+### Manual Setup Entry
+If you need to reconfigure the WiFi without wiping files, you can force Setup Mode:
+1.  **Button**: Hold the physical button for **>10 seconds**.
+2.  **REPL**: Connect via USB/Thonny and run:
+    ```python
+    import admin as a
+    a.reset()
+    a.run()
+    ```
+    *(Note: Older clocks without buttons must use this REPL method).*
+
+### The Setup Process
+In **Setup Mode**, the clock functions as a WiFi Access Point.
+1.  **Connect**: Use your phone or computer to connect to the clock's WiFi network (Open/No Password).
+2.  **Configure**: You should be redirected to a configuration portal.
+3.  **Select Network**: Choose your home WiFi SSID, enter the password, and give yor clock a custom Name (e.g., "Living Room").
+4.  **Save**: The clock will reboot and connect to your network.
+
+## Usage Guide
+
+### Getting Started
+Once connected to WiFi, the clock automatically synchronizes time via NTP.
+- **Finding the IP Address**:
+    - **With Button**: Press the button for ~1 second. The IP address will scroll on the display.
+    - **No Button**: Cycle the power. The IP address scrolls on startup.
+- **Offline Mode**: If WiFi is unavailable but the RTC battery is good, the clock operates normally using the backup time.
+
+### Web Interface
+Access the dashboard by entering the clock's IP address in your browser.
+- **Status**: Live view of time, date, and logs.
+- **Settings**: Change brightness, colors, and 12/24h mode.
+- **alarms**: Manage daily/weekly alarms.
+- **Animations**: Trigger demo modes.
+
+### Physical Controls
+- **Short Press**: Scroll Status (IP Address / Connection).
+- **Long Press (>2s)**: Enter Brightness Mode. Hold again to cycle brightness; release to save.
+- **Very Long Press (>10s)**: Factory Reset (Enters Setup Mode).
 
 ## Features
 
 - **Precision Timekeeping**: Synchronizes with NTP servers over WiFi and maintains time with a DS3231 RTC module when offline.
-- **Web Interface**: responsive web dashboard to:
-    - View live status (Time, Date, IP).
-    - Configure display settings (Brightness, Colors, Orientation).
-    - Manage alarms.
-    - Trigger animations.
 - **Advanced Alarm System**: 
     - Supports Daily, Hourly, Weekly, and One-shot alarms.
     - JSON-based scheduling with "disabled spans" and specific "skip hours".
     - Different action types: Scrolling text, blinking display.
     - "Critical Time" mode that overrides display during alarms.
-- **Physical Controls**: Multi-function button for:
-    - **Short Press**: Scroll Status (IP Address / Connection State).
-    - **Long Press (>2s)**: Enter Brightness Adjustment Mode (hold again to cycle brightness).
-    - **Very Long Press (>10s)**: Factory Reset (clears WiFi credentials and reboots).
 - **Customizable Display**:
     - 12/24 Hour logic.
     - Adjustable Colors for Digits, Colon, and Seconds.
@@ -58,111 +91,6 @@ A highly customizable, web-connected NeoPixel matrix clock powered by a Raspberr
 - **NeoPixels**: GPIO 16
 - **Button**: GPIO 17
 - **RTC (I2C)**: Auto-detected on standard behaviors (often GPIO 0/1 or 4/5).
-
-## Installation
-
-1. **Flash MicroPython**: Install the latest MicroPython firmware for Raspberry Pi Pico W.
-2. **Upload Code**: Copy all `.py`, `.html`, and `.js` files to the root of the Pico W.
-3. **First Run**:
-    - When powered on for the first time (or after a reset), the clock will enter **Setup Mode** if no `ssid.json` is found.
-    - The clock will likely display messages or indicators if not connected.
-    - Connect to the AP (if implemented) or manually create `ssid.json` with WiFi credentials.
-
-
-
-## Usage
-
-### Web Interface
-Navigate to the clock's IP address in a browser.
-- **Status Panel**: Shows current time and system logs.
-- **Settings**: Adjust colors, blinking, and brightness. Changes are persisted to `settings.json`.
-- **Animations**: Manually trigger rainbow, scrolling text, or bouncing box demos.
-- **Alarms**: View and manage the list of active alarms.
-
-### Button Controls
-- **Click**: Scrolls connection status. Red = Offline, Blue = IP Address.
-- **Hold (2-10s)**: "Adj BRT" appears. Release, then hold again to cycle brightness up/down. Release to save.
-- **Hold (10s+)**: "RESET" appears. Clears WiFi settings and reboots. Use with caution.
-
-## API Documentation
-
-The Web Server exposes a REST-like API for integration.
-
-### `GET /api/status`
-Returns full system status.
-```json
-{
-    "time": [14, 30, 05],
-    "date": {"year": 2025, ...},
-    "brightness": 0.5,
-    "rotation": false,
-    ...
-}
-```
-
-### `POST /api/settings`
-Update configuration. Partial updates allowed.
-**Payload:**
-```json
-{
-    "brightness": 0.8,
-    "color": "#FF0000",
-    "twelve_hour": true,
-    "rotation": true
-}
-```
-
-### `POST /api/animation`
-Trigger immediate feedback animations.
-**Payload:**
-```json
-{
-    "name": "scroll_custom",
-    "text": "Hello User"
-}
-```
-Supported names: `stop`, `rainbow`, `scroll`, `scroll_custom`, `bounce_red`, `bounce_blue`.
-
-### `GET /api/alarms`
-Retrieve list of alarms.
-
-### `POST /api/alarms`
-Manage alarms.
-**Payload:**
-```json
-{
-    "cmd": "add",
-    "alarm": {
-        "name": "Wake Up",
-        "schedule": { "time": "07:00", "days": [1,2,3,4,5] },
-        "action": { "type": "scroll", "payload": { "text": "WAKE UP!" } }
-    }
-}
-```
-**Commands**: `add`, `update`, `delete`.
-
-## Alarm Schedule Schema
-
-The alarm system is powerful. Example of a repeating weekday alarm:
-```json
-{
-    "enabled": true,
-    "schedule": {
-        "frequency": "daily", 
-        "time": "08:30",
-        "days": [1, 2, 3, 4, 5] 
-    },
-    "action": {
-        "type": "scroll",
-        "duration_sec": 300,
-        "payload": {
-            "text": "Morning Meeting",
-            "color": "#00FF00"
-        }
-    }
-}
-```
-*(Note: `days` 0=Monday, 6=Sunday)*
 
 ## License
 
