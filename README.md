@@ -2,6 +2,17 @@
 
 A highly customizable, web-connected NeoPixel matrix clock powered by a Raspberry Pi Pico W. This project features accurate timekeeping via NTP and RTC, a responsive Web UI for configuration, robust alarm scheduling, and smooth animations.
 
+> [!IMPORTANT]
+> **Setup Mode** will be automatically entered for a new clock. For an existing clock, setup mode can be entered by a long button press (>10s), or by gaining access to the REPL and issuing these commands:
+> ```python
+> import admin as a
+> a.reset()
+> a.run()
+> ```
+> Older clocks can also be reset using these same commands with `admin`.
+>
+> In **Setup Mode**, the clock creates its own WiFi Access Point. Connect to this network (no password required) using your phone or computer. You will be automatically redirected to a configuration page where you can select your local WiFi network, enter the password, and give your clock a custom name.
+
 ## Features
 
 - **Precision Timekeeping**: Synchronizes with NTP servers over WiFi and maintains time with a DS3231 RTC module when offline.
