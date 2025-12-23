@@ -4,6 +4,7 @@
 from machine import Pin, I2C, SoftI2C
 import persistent_logger
 import time
+import json
 
 class RealTimeClock:
     RTC_ADDR = 0x68
@@ -14,51 +15,70 @@ class RealTimeClock:
     def inst(cls):
         return cls._instance
 
-    RTC_ADDR = 0x68
-    EEPROM_ADDR = 0x57
-
     def __init__(self, i2c=None):
         if RealTimeClock._instance is not None:
             raise RuntimeError("RealTimeClock already initialized")
         RealTimeClock._instance = self
 
+        found = False
+        
         if i2c:
             self.i2c = i2c
+            found = True
         else:
-            # Auto-detect pins
-            # Candidates: (SDA, SCL)
-            # Version 1: GPIO 4, 5
-            # Version 2: GPIO 0, 1
-            # Assuming standard ordering (SDA, SCL) consistency or trying intuitive mappings
-            # Note: SoftI2C(scl, sda)
+            # Auto-detect pins logic
             
-            candidates = [
-                (4, 5), # sda=4, scl=5
-                (0, 1)  # sda=0, scl=1
-            ]
-            
-            found = False
-            for sda_pin, scl_pin in candidates:
-                try:
-                    # SoftI2C takes (scl, sda) positional
-                    bus = SoftI2C(Pin(scl_pin), Pin(sda_pin), freq=100_000)
-                    devices = bus.scan()
-                    if self.RTC_ADDR in devices:
-                        print(f"RTC found on SDA={sda_pin}, SCL={scl_pin}")
-                        self.i2c = bus
-                        found = True
-                        break
-                except Exception as e:
-                    print(f"Failed to init I2C on SDA={sda_pin}, SCL={scl_pin}: {e}")
+            # 1. Try Cached Pins
+            try:
+                with open("hardware.json", "r") as f:
+                    hw = json.load(f)
+                    cached_sda = hw.get("sda")
+                    cached_scl = hw.get("scl")
+                    
+                    if cached_sda is not None and cached_scl is not None:
+                        # Try to init with cached
+                        print(f"RTC: Probing cached pins SDA={cached_sda}, SCL={cached_scl}...")
+                        bus = SoftI2C(Pin(cached_scl), Pin(cached_sda), freq=100_000)
+                        if self.RTC_ADDR in bus.scan():
+                            print(f"RTC: Found on cached pins.")
+                            self.i2c = bus
+                            found = True
+            except:
+                pass
+
+            # 2. If not found, Scan Candidates
+            if not found:
+                candidates = [
+                    (4, 5), # sda=4, scl=5
+                    (0, 1)  # sda=0, scl=1
+                ]
+                
+                for sda_pin, scl_pin in candidates:
+                    try:
+                        # SoftI2C takes (scl, sda) positional
+                        bus = SoftI2C(Pin(scl_pin), Pin(sda_pin), freq=100_000)
+                        devices = bus.scan()
+                        if self.RTC_ADDR in devices:
+                            print(f"RTC: Found on SDA={sda_pin}, SCL={scl_pin}")
+                            self.i2c = bus
+                            found = True
+                            
+                            # Cache the working configuration
+                            try:
+                                with open("hardware.json", "w") as f:
+                                    json.dump({"sda": sda_pin, "scl": scl_pin}, f)
+                                    print("RTC: Cached pins to hardware.json")
+                            except Exception as e:
+                                print(f"RTC: Failed to cache pins: {e}")
+                                
+                            break
+                    except Exception as e:
+                        print(f"Failed to init I2C on SDA={sda_pin}, SCL={scl_pin}: {e}")
             
             if not found:
                 print("Warning: RTC not found on any default pins. Defaulting to SDA=0, SCL=1 without confirm.")
                 persistent_logger.log("RTC Error: DS3231 Hardware not found or pins incorrect")
-                # Fallback to avoid complete crash if unplugged, or raise error?
-                # User said "Modify rtc_module to automatically figure out..."
-                # If it determines "not found", we might want to just set a default to prevent 'self.i2c' attribute error later,
-                # or let it fail.
-                # I'll fall back to 0, 1.
+                # Fallback to avoid complete crash if unplugged
                 self.i2c = SoftI2C(Pin(1), Pin(0), freq=100_000)
         
         self.rtc_present = found
@@ -122,7 +142,7 @@ class RealTimeClock:
         else:
             hours = self._bcd2dec(raw[2])
 
-        wday = raw[3]
+        wday = raw[3] - 1
         day = self._bcd2dec(raw[4])
         month = self._bcd2dec(raw[5] & 0x7F) # Mask potentially century bit if present
         year = self._bcd2dec(raw[6]) + 2000
@@ -179,7 +199,7 @@ class RealTimeClock:
         data[0] = self._dec2bcd(seconds)
         data[1] = self._dec2bcd(minutes)
         data[2] = self._dec2bcd(hours)
-        data[3] = self._dec2bcd(dow) 
+        data[3] = self._dec2bcd(dow + 1) 
         data[4] = self._dec2bcd(day)
         data[5] = self._dec2bcd(month)
         data[6] = self._dec2bcd(year - 2000)

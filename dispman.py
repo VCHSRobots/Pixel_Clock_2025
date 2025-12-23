@@ -136,13 +136,18 @@ class DisplayManager:
             # 1. Process queued (foreground) animations
             if self._queue:
                 # pop from front of list
-                anim = self._queue.pop(0)
+                item = self._queue.pop(0)
+                if isinstance(item, tuple):
+                    anim, cb = item
+                else:
+                    anim = item
+                    cb = None
 
                 # Pause the default animation while foreground runs
                 if self.default_anim is not None:
                     self.default_anim.hold()
 
-                await self._run_anim(anim)
+                await self._run_anim(anim, cb)
 
                 # After foreground finishes, let default continue (if not stopping)
                 if self.default_anim is not None and not self.stop_event.is_set():
@@ -182,7 +187,7 @@ class DisplayManager:
             except Exception as e:
                 print("Default animation error during shutdown:", e)
     
-    async def _run_anim(self, anim):
+    async def _run_anim(self, anim, callback=None):
         """Run a single foreground animation until it finishes or is cancelled."""
         # Make sure it is not paused when starting
         anim.resume()
@@ -203,6 +208,12 @@ class DisplayManager:
             anim.stop()
             self.current_anim = None
             self.current_task = None
+            
+            if callback:
+                try:
+                    callback()
+                except Exception as ex:
+                    print("Callback Error:", ex)
 
     # ------------------------------------------------------------------
     # Public API
@@ -233,10 +244,10 @@ class DisplayManager:
         NOTE: Animations are assumed to be "single-use" objects (except default).
               Create a new instance for each scheduled play.
         """
-        self._queue.append(anim)
+        self._queue.append((anim, None))
         self._work_event.set()  # wake runner
 
-    def play_immediate(self, anim):
+    def play_immediate(self, anim, on_complete=None):
         """
         Run an animation object (instance) immediately.
 
@@ -256,7 +267,7 @@ class DisplayManager:
             self.default_anim.hold()
 
         # Push new animation to FRONT of queue
-        self._queue.insert(0, anim)
+        self._queue.insert(0, (anim, on_complete))
         self._work_event.set()  # wake runner immediately
 
     def stop_foreground(self):
@@ -328,13 +339,7 @@ class BouncingDotAnimation(BaseAnimation):
         - display.width  (int)
     """
 
-    def __init__(self, width=None, color=(50, 0, 0)): # Keep default dim red or change to constant? 
-    # The prompt asked to add constants for colors. (50, 0, 0) is a custom color.
-    # I will leave custom colors as is or define them if they are common.
-    # However, for consistency, I can use a dimmed red if I had one, or just leave it.
-    # The prompt said "add constants for colors... and use them".
-    # (50, 0, 0) is close to a DIM_RED.
-    # I'll stick to replacing obvious ones like (0,0,0).
+    def __init__(self, width=None, color=(50, 0, 0)): # Keep default dim red
         super().__init__()
         # If width not provided, assume full display width
         self.width = width if width is not None else self._display.width
@@ -369,4 +374,3 @@ class BouncingDotAnimation(BaseAnimation):
 
             # Frame delay
             await asyncio.sleep_ms(50)
-

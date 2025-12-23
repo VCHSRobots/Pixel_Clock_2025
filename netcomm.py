@@ -3,7 +3,6 @@
 
 import network
 import uasyncio as asyncio
-import config
 import settings_manager
 import ntptime
 
@@ -35,16 +34,29 @@ class NetworkManager:
         self._load_credentials()
 
     def _load_credentials(self):
-        settings = settings_manager.get_settings_manager()
-        self.ssid = settings.get("ssid", "")
-        self.password = settings.get("password", "")
+        # New Logic: Load from ssid.json
+        import json
+        self.ssid = ""
+        self.password = ""
+        try:
+            with open("ssid.json", "r") as f:
+                data = json.load(f)
+                self.ssid = data.get("ssid", "")
+                self.password = data.get("password", "")
+        except:
+            # File doesn't exist or error
+            pass
         
-        if not self.ssid:
-            self.ssid = config.SSID
-            self.password = config.PASSWORD
+    def has_credentials(self):
+        """Returns True if a valid SSID is configured."""
+        return bool(self.ssid and self.ssid.strip())
 
     def start(self):
-        """Start the background connection monitor."""
+        """Start the background connection monitor if credentials exist."""
+        if not self.has_credentials():
+            print("NetComm: No credentials. Network Monitor not started.")
+            return
+
         if self._monitor_task is None:
             self._monitor_task = asyncio.create_task(self._maintain_connection())
 

@@ -388,3 +388,39 @@ class MessageDisplay(BaseAnimation):
                 return
                 
             await asyncio.sleep_ms(100)
+
+class NoWifiAnim(BaseAnimation):
+    """
+    Static "NO (Red) Wifi (Blue)" message with custom tight kerning.
+    Fits on 32-pixel display.
+    """
+    def __init__(self):
+        super().__init__()
+        
+    async def run(self):
+        while not self.stopped:
+            if self.paused:
+                await asyncio.sleep_ms(100)
+                continue
+                
+            self._display.fill(neodisplay.BLACK)
+            
+            # "NO" in RED
+            # N: Standard width 5. x=0
+            self._display.draw_char(0, 1, 'N', neodisplay.RED, font=neodisplay.NeoDisplay.FONT_LARGE)
+            
+            # O: Standard width 'O'. (1px space after N)
+            self._display.draw_char(6, 1, 'O', neodisplay.RED, font=neodisplay.NeoDisplay.FONT_LARGE)
+            
+            # "Wifi" in BLUE
+            # Manual kerning to fit and look tight
+            self._display.draw_char(14, 1, 'W', neodisplay.BLUE, font=neodisplay.NeoDisplay.FONT_LARGE)
+            self._display.draw_char_tight(20, 1, 'i', neodisplay.BLUE, font=neodisplay.NeoDisplay.FONT_LARGE)
+            self._display.draw_char(23, 1, 'f', neodisplay.BLUE, font=neodisplay.NeoDisplay.FONT_LARGE)
+            self._display.draw_char_tight(29, 1, 'i', neodisplay.BLUE, font=neodisplay.NeoDisplay.FONT_LARGE)
+            
+            self._display.show()
+
+            # Check stop/pause frequently or just update logic? 
+            # Since it's static, we can sleep long.
+            await asyncio.sleep_ms(200)

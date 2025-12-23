@@ -52,7 +52,7 @@ class ButtonController:
                         duration = await self._measure_press_duration()
                         
                         if duration >= SETUP_PRESS_MS:
-                             await self._trigger_setup()
+                             await self._trigger_factory_reset()
                              await self._wait_for_release()
                         elif duration >= LONG_PRESS_MS:
                              print("Button: Long Press -> Brightness Mode")
@@ -155,7 +155,10 @@ class ButtonController:
         text = ""
         color = neodisplay.BLUE
         
-        if nm.is_connected():
+        if not nm.has_credentials():
+             text = "Offline: No WiFi Info Saved"
+             color = neodisplay.RED
+        elif nm.is_connected():
             text = f"IP: {nm.get_ip()}"
         else:
             text = "No Connection"
@@ -164,15 +167,37 @@ class ButtonController:
         anim = animations.ScrollingText(text, color=color, loops=1, starting_x=10, pause_on_entry=3.0)
         dispman.get_display_manager().play_immediate(anim)
 
-    async def _trigger_setup(self):
-        print("Button: Very Long Press -> Setup Mode")
-        display = neodisplay.get_display()
-        display.brightness(1.0)
-        anim = animations.MessageDisplay("SETUP", duration=5.0, color=neodisplay.MAGENTA)
+    async def _trigger_factory_reset(self):
+        print("Button: Very Long Press -> Factory Reset")
+        
+        # 1. Message
+        anim = animations.MessageDisplay("RESET", duration=3.0, color=neodisplay.RED)
         dispman.get_display_manager().play_immediate(anim)
-        await anim.wait_for_finish()
-        display.brightness(0.05)
-        # Setup is a stub for now. Use loops=3 to indicate 'mode' active for a bit then exit.
+        
+        # Wait for user to see it
+        await asyncio.sleep(3)
+        
+        # 2. Delete ssid.json
+        import os
+        try:
+            os.remove("ssid.json")
+            print("Reset: ssid.json deleted")
+        except:
+             print("Reset: ssid.json not found or error")
+             
+        # 3. Invalidate Time
+        import rtc_module
+        rtc = rtc_module.get_rtc()
+        # Set to Year 2000 (Invalid < 2020)
+        # tuple: (year, month, day, hour, min, sec, wday, doy)
+        dt = (2000, 1, 1, 0, 0, 0, 0, 0)
+        rtc.set_time(dt)
+        print("Reset: Time invalidated to Year 2000")
+        
+        # 4. Reboot
+        print("Reset: Rebooting...")
+        import machine
+        machine.reset()
 
 def get_button_controller():
     """Get the singleton instance. If not exists, create it."""

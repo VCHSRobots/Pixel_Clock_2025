@@ -10,6 +10,12 @@ import time_keeper
 HH_MM = 0
 HH_MM_SS = 1
 
+# Blink Modes
+BLINK_NONE = 0
+BLINK_SEC = 1
+BLINK_MIN = 2
+BLINK_FAST = 3
+
 class TimeDisplay(BaseAnimation):
     """
     Displays the current time.
@@ -34,9 +40,25 @@ class TimeDisplay(BaseAnimation):
         self.colon_color = neodisplay.WHITE
         self.seconds_color = neodisplay.WHITE
         self.twelve_hour = True
+        self.blink_mode = BLINK_NONE
+        
+        # Syncing variables
+        self.last_s = -1
+        self.second_start_ticks = 0
+        
+        # Global Blink
+        self.global_blink_rate = 0
+        self.global_blink_duty = 0.5
 
     def set_mode(self, mode):
         self.mode = mode
+
+    def set_blink_mode(self, mode):
+        self.blink_mode = mode
+
+    def set_global_blink(self, rate, duty_cycle=0.5):
+        self.global_blink_rate = rate
+        self.global_blink_duty = duty_cycle
 
     def set_color(self, color):
         self.color = color
@@ -59,10 +81,21 @@ class TimeDisplay(BaseAnimation):
             self._draw()
             self._display.show()
             
-            # Update frequency: 5 times a second is enough for seconds to feel responsive
-            await asyncio.sleep_ms(200)
+            # Update frequency: Higher rate (50Hz) to catch seconds transition smoothly and reduce blink jitter
+            await asyncio.sleep_ms(20)
 
     def _draw(self):
+        import time
+        
+        # Global Blink Check
+        if self.global_blink_rate > 0:
+            period = int(1000 / self.global_blink_rate)
+            if period > 0:
+                t = time.ticks_ms()
+                if (t % period) > (period * self.global_blink_duty):
+                    self._display.fill(neodisplay.BLACK)
+                    return
+
         t = time_keeper.get_time()
         
         if isinstance(t, str):
@@ -71,6 +104,11 @@ class TimeDisplay(BaseAnimation):
             return
             
         h, m, s = t
+        
+        # Detect Seconds Transition for Sync
+        if s != self.last_s:
+            self.last_s = s
+            self.second_start_ticks = time.ticks_ms()
         
         # 12-hour conversion
         if self.twelve_hour:
@@ -123,7 +161,7 @@ class TimeDisplay(BaseAnimation):
         if self.twelve_hour:
             s_h = "{:d}".format(h)
         else:
-            s_h = "{:02d}".format(h)
+            s_h = "{:d}".format(h)
         s_m = "{:02d}".format(m)
         s_s = "{:02d}".format(s)
                
@@ -150,10 +188,34 @@ class TimeDisplay(BaseAnimation):
             x += 4 
 
     def _draw_colon(self, x, y, color):
-        # Draw single column colon
-        # New design: 2 pixels total
-        self._display.pixel(x, 3, color)
-        self._display.pixel(x, 5, color)
+        import time
+        t = time.ticks_ms()
+        show = True
+        
+        if self.blink_mode == BLINK_SEC:
+            # Synced 1 Hz Blink:
+            # Calculate time elapsed since the last second started
+            diff = time.ticks_diff(t, self.second_start_ticks)
+            
+            # Show for first 500ms, Hide for next 500ms
+            # This ensures colon turns ON exactly when seconds digit changes
+            if diff < 500:
+                show = True
+            elif diff < 1000:
+                show = False
+            else:
+                # Fallback if we missed a second update (shouldn't happen often)
+                show = ((diff // 500) % 2) == 0
+                
+        elif self.blink_mode == BLINK_FAST:
+             # Fast: 100ms ON, 100ms OFF, also synced for consistency
+             diff = time.ticks_diff(t, self.second_start_ticks)
+             if (diff % 200) > 100:
+                 show = False
+        
+        if show:
+            self._display.pixel(x, 3, color)
+            self._display.pixel(x, 5, color)
 
     def _draw_digit_tight(self, x, y, char, color):
         # Fetch packed integer from tuple

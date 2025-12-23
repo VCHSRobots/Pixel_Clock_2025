@@ -36,8 +36,8 @@ OFF = BLACK
 FONT_5x7 = (
     0x0000000000, 0x00005F0000, 0x0007070000, 0x147F147F14, 0x242A7F2A12, 0x2313086462, 0x3649552250, 0x0000030000,
     0x001C224100, 0x0041221C00, 0x14083E0814, 0x08083E0808, 0x0050300000, 0x0808080808, 0x0060600000, 0x2010080402,
-    0x3E4141413E, 0x00427F4000, 0x6251494946, 0x2241494936, 0x1814127F10, 0x2745454539, 0x3C4A494930, 0x0371090503,
-    0x3649494936, 0x264949493E, 0x0036360000, 0x0056360000, 0x0814224100, 0x1414141414, 0x0041221408, 0x0201510906,
+    0x3E4141413E, 0x00427F4000, 0x7249494946, 0x2241494936, 0x0F08087F08, 0x4F49494931, 0x3E49494931, 0x0171090907,  # 0 - 7
+    0x3649494936, 0x264949493E, 0x0036360000, 0x0056360000, 0x0814224100, 0x1414141414, 0x0041221408, 0x0201510906,  # 8, 9
     0x324979413E, 0x7E1111117E, 0x7F49494936, 0x3E41414122, 0x7F4141413E, 0x7F49494941, 0x7F09090901, 0x3E4141493A,
     0x7F0808087F, 0x00417F4100, 0x2040413F01, 0x7F08142241, 0x7F40404040, 0x7F020C027F, 0x7F0408107F, 0x3E4141413E,
     0x7F09090906, 0x3E4151215E, 0x7F09192946, 0x0649494930, 0x01017F0101, 0x3F4040403F, 0x1F2040201F, 0x3F4038403F,
@@ -89,12 +89,16 @@ class NeoDisplay:
         self.pin = machine.Pin(pin_num, machine.Pin.OUT)
         self.np = neopixel.NeoPixel(self.pin, NeoDisplay.N)
         self._brightness = brightness
+        self._rotated = False
         self._current_task = None
         self.pixels = [0] * NeoDisplay.N 
 
         # Ensure black on start
         self.fill(BLACK)
         self.show()
+
+    def set_rotation(self, rotated):
+        self._rotated = rotated
 
     @property
     def width(self):
@@ -127,7 +131,7 @@ class NeoDisplay:
             r, g, b = (int(r * f) & 0xFF, int(g * f) & 0xFF, int(b * f) & 0xFF)
             self.np[i] = (r, g, b)
         self.np.write()
-    
+
     def _coord(self, x, y):
         """
         Convert logical x,y to physical index.
@@ -140,8 +144,12 @@ class NeoDisplay:
         if x < 0 or x >= NeoDisplay.WIDTH or y < 0 or y >= NeoDisplay.HEIGHT:
             return -1
 
-        x = NeoDisplay.WIDTH - 1 - x 
-        y = NeoDisplay.HEIGHT - 1 - y
+        if not self._rotated:
+            x = NeoDisplay.WIDTH - 1 - x 
+            y = NeoDisplay.HEIGHT - 1 - y
+        
+        # If rotated, we use x, y as is, which flips it 180 degrees relative to the default mapping logic above.
+
         idx = x * NeoDisplay.HEIGHT
         if (x % 2 == 1): idx += (NeoDisplay.HEIGHT - 1 - y)   # We are on a backwards column
         else:            idx += y
@@ -336,8 +344,10 @@ class NeoDisplay:
             cursor_x = self.draw_char(cursor_x, y, char, color, font)
         return cursor_x
 
-    def draw_char_tight(self, x, y, char, color):
-        """Draw 0 or 1 chars tightly, using 4 spaces instead of 5. Large Font."""
+    def draw_char_tight(self, x, y, char, color, font=None):
+        """Draws some chars tightly (0, 1, O, and i), using fewer column pixels.  
+        Returns pixels used plus 1 for spacing. Large Font.  If
+        not a special char, draw normally."""
         if char == '1':
             self.pixel(x + 1, y + 1, color)
             self.pixel(x + 1, y + 6, color)
@@ -349,17 +359,49 @@ class NeoDisplay:
             self.pixel(x + 2, y + 5, color)
             self.pixel(x + 2, y + 6, color)
             self.pixel(x + 3, y + 6, color)
-            return x + 4
+            return x + 5
+        elif char == '0' or char == 'O':
+            for i in range(7):
+                self.pixel(x, y + i, color)
+                self.pixel(x + 3, y + i, color)
+            self.pixel(x + 1, y + 0, color)
+            self.pixel(x + 2, y + 0, color)
+            self.pixel(x + 1, y + 6, color)
+            self.pixel(x + 2, y + 6, color)
+            return x + 5
+        elif char == 'i':
+            self.pixel(x + 1, y + 1, color)
+            self.pixel(x + 1, y + 3, color)
+            self.pixel(x + 1, y + 4, color)
+            self.pixel(x + 1, y + 5, color)
+            self.pixel(x + 1, y + 6, color)
+            return x + 3
+        elif char == '2':
+            self.draw_glyph(x, y, 0x7249494600, 7, color)
+            return x + 5
+        elif char == 'i':
+            self.pixel(x + 1, y + 1, color)
+            self.pixel(x + 2, y + 0, color)
+            self.pixel(x + 1, y + 6, color)
+            self.pixel(x + 2, y + 6, color)
+            return x + 5
+        elif char == 'i':
+            self.pixel(x + 1, y + 1, color)
+            self.pixel(x + 1, y + 3, color)
+            self.pixel(x + 1, y + 4, color)
+            self.pixel(x + 1, y + 5, color)
+            self.pixel(x + 1, y + 6, color)
+            return x + 3
         elif char == '0':
             for i in range(7):
                 self.pixel(x, y + i, color)
                 self.pixel(x + 3, y + i, color)
             self.pixel(x + 1, y + 0, color)
             self.pixel(x + 2, y + 0, color)
-            self.pixel(x + 1, y + 5, color)
-            self.pixel(x + 2, y + 5, color)
-            return x + 4
-        return x
+            self.pixel(x + 1, y + 6, color)
+            self.pixel(x + 2, y + 6, color)
+            return x + 5
+        return self.draw_char(x, y, char, color, font)
 
 def get_display():
     """Get the singleton instance of the display. Create it if it doesn't exist."""

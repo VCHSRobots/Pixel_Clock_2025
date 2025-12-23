@@ -302,7 +302,7 @@ def test_rainbow(duration=10, speed=2, scale=5, brightness=0.2):
     except KeyboardInterrupt:
         print("Interrupted.")
 
-def start_main():
+def run():
     """Start the main application loop."""
     print("Starting Main Application...")
     import gc
@@ -445,3 +445,21 @@ def debug_time_calc():
         
     final_t = time.localtime(local_seconds)
     print(f"8. Final Tuple: {final_t}")
+
+def reset():
+    """Reset the device to factory defaults."""
+    import os
+    import machine
+    
+    print("Resetting device to factory defaults...")
+    try :
+        os.remove("ssid.json")
+    except:
+        pass
+    reset_rtc()
+    print("Clock will go into setup mode.")
+
+def reboot():
+    """Reboot the device."""
+    import machine
+    machine.reset() 

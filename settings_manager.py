@@ -3,15 +3,15 @@ import os
 
 class SettingsManager:
     DEFAULT_SETTINGS = {
-        "brightness": 0.25,
-        "mode": 0, # HH_MM
-        "12_hour_mode": False,
-        "seconds_color": (0, 0, 255),  # Default blue
-        "digit_color": (255, 255, 255), # Default white
-        "colon_color": (255, 255, 255),  # Default white
-        "ssid": "",
-        "password": "",
-        "timezone_offset": -8 # Default PST
+        "brightness": 0.15,
+        "mode": 1, # HH_MM_SS
+        "12_hour_mode": True,
+        "seconds_color": (2, 2, 116),  # Default: dim blue
+        "digit_color": (255, 0, 0), # Default: red
+        "colon_color": (255, 0, 0), # Default: red
+        "colon_blink_mode": 0, # 0=None, 1=1Hz, 2=Min, 3=Fast
+        "timezone_offset": -8, # Default PST
+        "rotation": False # Default: Standard orientation
     }
     
     FILE_NAME = "settings.json"
