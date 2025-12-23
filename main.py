@@ -145,7 +145,11 @@ async def main():
                  
              # Sync Time Immediately
              print("Startup: Syncing NTP...")
-             ns.sync_time()
+             try:
+                ns.sync_time()
+                print("Startup: NTP Sync Request Sent")
+             except Exception as e:
+                print(f"Startup: NTP Sync Error {e}")
         
         async def announce_ip():
             while not ns.is_connected():
@@ -175,7 +179,9 @@ async def main():
         print(f"Free Mem before Server: {gc.mem_free()}")
         # Use keyword argument to be explicit and potentially avoid positional mismatch issues
         server = web_server.WebServer(device_name=device_name)
+        print("Startup: Starting Web Server...")
         await server.start()
+        print("Startup: Web Server Started")
     else:
         print("Main: Offline Mode (No SSID) -> Skipping Network & Web Server")
         # Just wait for animation then stop it
@@ -203,5 +209,26 @@ async def main():
 if __name__ == "__main__":
     try:
         asyncio.run(main())
+    except Exception as e:
+        import persistent_logger
+        import sys
+        
+        # Format the error
+        err_msg = f"CRITICAL CRASH: {e}"
+        print(err_msg)
+        sys.print_exception(e) # Print traceback to serial
+        
+        try:
+            persistent_logger.log(err_msg)
+            # Optional: Log traceback details if possible, but keeping it simple for now
+        except:
+            print("Failed to log crash to persistent storage")
+
+        # Wait for logs to flush and user to possibly see output
+        import time
+        import machine
+        print("Rebooting in 5 seconds...")
+        time.sleep(5)
+        machine.reset()
     finally:
         asyncio.new_event_loop()
