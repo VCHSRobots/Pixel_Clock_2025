@@ -12,6 +12,14 @@ A highly customizable, web-connected NeoPixel matrix clock powered by a Raspberr
 > Older clocks can also be reset using these same commands with `admin`.
 >
 > In **Setup Mode**, the clock creates its own WiFi Access Point. Connect to this network (no password required) using your phone or computer. You will be automatically redirected to a configuration page where you can select your local WiFi network, enter the password, and give your clock a custom name.
+>
+> ### Getting Started
+> Once the clock connects to the internet, it will automatically synchronize the time. You can then modify the clock's settings through the web interface.
+>
+> **Finding the IP Address**: On power-up, or when you press the button for about 1 second, the clock will scroll its assigned IP address. Enter this IP into your browser to access the configuration page. From there, you can modify all settings (except the device name).
+> 
+> > [!NOTE]
+> > Older clocks do not have a button. To see the IP address scroll on these devices, simply cycle the power.
 
 ## Features
 
@@ -58,22 +66,7 @@ A highly customizable, web-connected NeoPixel matrix clock powered by a Raspberr
     - The clock will likely display messages or indicators if not connected.
     - Connect to the AP (if implemented) or manually create `ssid.json` with WiFi credentials.
 
-### `ssid.json` Format
-```json
-{
-    "ssid": "YOUR_WIFI_SSID",
-    "password": "YOUR_WIFI_PASSWORD",
-    "name": "Living Room Clock"
-}
-```
 
-### Getting Started
-Once the clock connects to the internet, it will automatically synchronize the time. You can then modify the clock's settings through the web interface.
-
-**Finding the IP Address**: On power-up, or when you press the button for about 1 second, the clock will scroll its assigned IP address. Enter this IP into your browser to access the configuration page. From there, you can modify all settings (except the device name).
-
-> [!NOTE]
-> Older clocks do not have a button. To see the IP address scroll on these devices, simply cycle the power.
 
 ## Usage
 
