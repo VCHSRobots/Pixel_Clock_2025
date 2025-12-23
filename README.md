@@ -14,20 +14,20 @@ If you are building a new clock from scratch:
 If you have an older clock or are updating the software:
 1.  **Connect via USB**: Plug the Pico W into your computer.
 2.  **Open Thonny**: Ensure you can access the files on the device.
-3.  **Wipe Old Files**: It is highly recommended to **delete all existing files** on the device to ensure a clean text.
-    - You can do this manually in the file explorer or via REPL.
-4.  **Upload New Code**: Upload the new set of files.
-5.  **Restart**: Reset the board. If `ssid.json` was deleted, it will enter Setup Mode.
+3.  **Wipe Old Files**: It is highly recommended to **delete all existing files** on the device to ensure a clean start.
+    - You can do this manually in Thonny.
+4.  **Upload New Code**: Upload the new set of files with Thonny.
+5.  **Force Setup Mode**: See below. 
 
 ## Setup & Configuration
 
 ### Startup Behavior
-- **Setup Mode**: Automatically entered ONLY if `ssid.json` is missing **AND** the system time is invalid (e.g., fresh install or RTC battery failure).
-- **Offline Mode**: If `ssid.json` is missing but the time is valid (RTC backup), the clock enters Offline Mode immediately.
-- **Normal Operation**: Connects to the saved WiFi network found in `ssid.json`.
+- **Setup Mode**: Automatically entered ONLY if the wifi credentials are missing **AND** the system time is invalid (e.g., fresh install or RTC battery failure).
+- **Offline Mode**: If the wifi credentials are missing but the time is valid (RTC backup), the clock enters Offline Mode immediately.
+- **Normal Operation**: Connects to the network using the saved wifi credentials.
 
-### Manual Setup Entry
-If you need to reconfigure the WiFi without wiping files, you can force Setup Mode:
+### Force Setup Mode with REPL
+You can force Setup Mode in one of two ways:
 1.  **Button**: Hold the physical button for **>10 seconds**.
 2.  **REPL**: Connect via USB/Thonny and run:
     ```python
@@ -35,7 +35,7 @@ If you need to reconfigure the WiFi without wiping files, you can force Setup Mo
     a.reset()
     a.run()
     ```
-    *(Note: Older clocks without buttons must use this REPL method).*
+    *(Note: Older clocks without buttons must use the REPL method).*
 
 ### The Setup Process
 In **Setup Mode**, the clock functions as a WiFi Access Point.
