@@ -16,7 +16,9 @@ A highly customizable, web-connected NeoPixel matrix clock powered by a Raspberr
 > ### Getting Started
 > Once the clock connects to the internet, it will automatically synchronize the time. You can then modify the clock's settings through the web interface.
 >
-> **Finding the IP Address**: On power-up, or when you press the button for about 1 second, the clock will scroll its assigned IP address. Enter this IP into your browser to access the configuration page. From there, you can modify all settings (except the device name).
+> **Offline Mode**: If the clock cannot connect to WiFi but has valid time stored in its battery-backed RTC chip, it will continue to operate normally in offline mode.
+> 
+> **Using the Web Interface**: To access the web interface, you must first find the IP address of the clock. On power-up, or when you press the button for about 1 second, the clock will scroll its assigned IP address. Enter this IP into your browser to access the configuration page. From there, you can modify all settings (except the device name).
 > 
 > > [!NOTE]
 > > Older clocks do not have a button. To see the IP address scroll on these devices, simply cycle the power.
