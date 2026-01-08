@@ -108,6 +108,8 @@ class WebServer:
                 await self.serve_animation(writer, body)
             elif path == "/api/alarms":
                 await self.serve_alarms(writer, method, body)
+            elif path == "/api/force_ntp_sync" and method == "POST":
+                await self.serve_force_ntp_sync(writer)
             else:
                 await self.serve_404(writer)
                 
@@ -336,6 +338,25 @@ class WebServer:
         except Exception as e:
             print("Alarm API Error:", e)
             writer.write("HTTP/1.0 500 Internal Server Error\r\n\r\n")
+
+    async def serve_force_ntp_sync(self, writer):
+        """Force an NTP sync, bypassing the time difference check."""
+        try:
+            import netcomm
+            import ntptime
+            
+            if netcomm.get_netcomm().is_connected():
+                # Call NTP sync with force=True
+                ntptime.set_rtc_time(force=True)
+                writer.write("HTTP/1.0 200 OK\r\n\r\n")
+                writer.write('{"status":"ok","message":"Force NTP sync initiated"}')
+            else:
+                writer.write("HTTP/1.0 503 Service Unavailable\r\n\r\n")
+                writer.write('{"status":"error","message":"Not connected to network"}')
+        except Exception as e:
+            print("Force NTP Sync Error:", e)
+            writer.write("HTTP/1.0 500 Internal Server Error\r\n\r\n")
+            writer.write('{"status":"error","message":"Internal error"}')
 
     async def serve_404(self, writer):
         writer.write("HTTP/1.0 404 Not Found\r\n\r\n")

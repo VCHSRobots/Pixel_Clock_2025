@@ -163,6 +163,29 @@ async function stopAnim() {
     });
 }
 
+async function forceNTPSync() {
+    if (!confirm('Force NTP sync? This will update the clock time regardless of the current time difference.')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch('/api/force_ntp_sync', {
+            method: 'POST'
+        });
+        const data = await res.json();
+        
+        if (data.status === 'ok') {
+            alert('NTP sync initiated successfully. Check system logs for results.');
+            log('Force NTP sync requested');
+        } else {
+            alert('Failed to sync: ' + (data.message || 'Unknown error'));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error initiating NTP sync');
+    }
+}
+
 setInterval(def_fetch, 1000);
 def_fetch();
 
